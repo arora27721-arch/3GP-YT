@@ -54,7 +54,7 @@ def parse_filesize(size_str):
 # Can be overridden via environment variables for different deployment environments
 MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 864000))  # 24 hours (unlimited for Cloud Shell)
 DOWNLOAD_TIMEOUT = None  # Unlimited download timeout (network timeouts handled by yt-dlp)
-FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 240))  # 24 hours retention
+FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 48))  # 24 hours retention
 MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '10G'))  # 10GB for Cloud Shell (generous storage)
 
 # Playlist storage
