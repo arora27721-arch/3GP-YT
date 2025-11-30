@@ -54,7 +54,7 @@ def parse_filesize(size_str):
 # Can be overridden via environment variables for different deployment environments
 MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 864000))  # 24 hours (unlimited for Cloud Shell)
 DOWNLOAD_TIMEOUT = None  # Unlimited download timeout (network timeouts handled by yt-dlp)
-FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 48))  # 24 hours retention
+FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 240))  # 24 hours retention
 MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '10G'))  # 10GB for Cloud Shell (generous storage)
 
 # Playlist storage
@@ -1686,6 +1686,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             gop_size = fps_num * 10  # GOP every 10 seconds for better compression
 
             convert_cmd = [
+                '-threads', str(FFMPEG_THREADS),
                 '-i', temp_video,
                 '-vf','scale=320:240:force_original_aspect_ratio=increase,setsar=1',
                 '-vcodec', 'mpeg4',
@@ -1724,6 +1725,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             if output_format == 'mp3':
                 # Simpler MP3 conversion - uses same quality preset but removes advanced options
                 simple_cmd = [
+                    '-threads', str(FFMPEG_THREADS),
                     '-i', temp_video,
                     '-vn',
                     '-acodec', 'libmp3lame',
@@ -1736,6 +1738,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             else:
                 # Simpler 3GP conversion - uses same quality preset but removes advanced options
                 simple_cmd = [
+                   '-threads', str(FFMPEG_THREADS),
                     '-i', temp_video,
                     '-vf', 'scale=320:240:force_original_aspect_ratio=increase,setsar=1',
                     '-vcodec', 'mpeg4',
@@ -2394,6 +2397,7 @@ def split_media_file(file_path, num_parts, file_id):
         if ext == '.mp3':
             # MP3 audio: re-encode with simple, compatible settings
             ffmpeg_cmd = [
+                '-threads', str(FFMPEG_THREADS),
                 '-ss', str(start_time),
                 '-i', file_path,
                 '-t', str(part_duration),
@@ -2409,6 +2413,7 @@ def split_media_file(file_path, num_parts, file_id):
             # 3GP video: re-encode with H.263 video + AMR-NB audio for maximum feature phone compatibility
             # AMR-NB (Adaptive Multi-Rate Narrowband) is the standard audio codec for 3GP on feature phones
             ffmpeg_cmd = [
+               '-threads', str(FFMPEG_THREADS),
                 '-ss', str(start_time),
                 '-i', file_path,
                 '-t', str(part_duration),
