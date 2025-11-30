@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: youtube-3gp-converter
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "bash build.sh"
+    startCommand: "gunicorn --bind=0.0.0.0:$PORT --workers=1 --threads=1 --timeout=600 --max-requests=50 --max-requests-jitter=10 --worker-class=sync --worker-tmp-dir=/dev/shm app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SESSION_SECRET
+        generateValue: true

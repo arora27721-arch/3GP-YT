@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Playlist Conversion{% endblock %}
+
+{% block meta %}
+{% endblock %}
+
+{% block content %}
+<h1>Playlist Detected</h1>
+
+<div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>[i] PLAYLIST INFORMATION</strong></p>
+<ul style="list-style: none; padding: 0;">
+<li><strong>Playlist:</strong> {{ playlist.title }}</li>
+<li><strong>Videos:</strong> {{ playlist.video_count }} videos</li>
+<li><strong>Format:</strong> {{ 'MP3 Audio' if output_format == 'mp3' else '3GP Video' }}</li>
+<li><strong>Quality:</strong> {% if output_format == 'mp3' %}{{ mp3_presets.get(quality, {}).get('name', 'Auto (128kbps)') }}{% else %}{{ video_presets.get(quality, {}).get('name', 'Auto (Low)') }}{% endif %}</li>
+</ul>
+</div>
+
+<div class="success">
+<p class="center"><strong>[OK] READY TO CONVERT PLAYLIST</strong></p>
+<p class="center" style="font-size: 16px; font-weight: bold;">{{ playlist.video_count }} videos will be converted</p>
+</div>
+
+<div class="info" style="background: #fff9e6; border-color: #d4a017;">
+<p class="center"><strong>[!] IMPORTANT - PLEASE READ</strong></p>
+<ul>
+<li><strong>Processing Time:</strong> This will take a while! Each video is downloaded and converted individually.</li>
+<li><strong>Server Load:</strong> Large playlists may take hours to process</li>
+<li><strong>Failures:</strong> Some videos may fail (private, deleted, age-restricted)</li>
+<li><strong>Data Usage:</strong> This will use significant bandwidth on 2G networks</li>
+<li><strong>Recommended:</strong> Best for playlists with 5-20 videos</li>
+</ul>
+</div>
+
+{% if playlist.video_count > 20 %}
+<div class="error">
+<p class="center"><strong>[!] WARNING: LARGE PLAYLIST</strong></p>
+<p class="center">This playlist has {{ playlist.video_count }} videos. Processing will take a very long time.</p>
+<p class="center">Consider converting individual videos instead</p>
+</div>
+{% endif %}
+
+<h2 style="margin-top: 20px;">Videos in Playlist:</h2>
+<div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; max-height: 300px; overflow-y: auto;">
+<ol style="font-size: 14px; margin: 0; padding-left: 20px;">
+{% for video in playlist.videos[:20] %}
+<li style="margin: 5px 0;">{{ video.title }}</li>
+{% endfor %}
+{% if playlist.video_count > 20 %}
+<li style="margin: 5px 0; color: #666;"><em>...and {{ playlist.video_count - 20 }} more videos</em></li>
+{% endif %}
+</ol>
+</div>
+
+<form method="POST" action="/playlist/convert">
+<input type="hidden" name="url" value="{{ url }}">
+<input type="hidden" name="format" value="{{ output_format }}">
+<input type="hidden" name="quality" value="{{ quality }}">
+
+<button type="submit" class="button" style="background: #4a904a; font-size: 18px; padding: 15px; margin: 15px 0;">
+[OK] START PLAYLIST CONVERSION
+</button>
+</form>
+
+<a href="/" class="button" style="background: #a44a4a;"><< Cancel and Go Back</a>
+
+<div class="info">
+<p class="center"><strong>Tips for Playlist Conversion:</strong></p>
+<ul>
+<li>Keep this page open or bookmark the status page</li>
+<li>Processing happens in the background</li>
+<li>You can close the browser and check back later</li>
+<li>All files expire after 6 hours</li>
+</ul>
+</div>
+
+{% endblock %}

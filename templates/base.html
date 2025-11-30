@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+{% block meta %}{% endblock %}
+<title>{% block title %}YouTube to 3GP{% endblock %}</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 10px;
+    background: #f0f0f0;
+    font-size: 14px;
+}
+.container {
+    max-width: 400px;
+    margin: 0 auto;
+    background: white;
+    padding: 15px;
+    border: 2px solid #333;
+}
+h1 {
+    font-size: 18px;
+    margin: 0 0 10px 0;
+    padding: 0;
+    text-align: center;
+    background: #333;
+    color: white;
+    padding: 8px;
+}
+h2 {
+    font-size: 16px;
+    margin: 15px 0 10px 0;
+    color: #333;
+}
+input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+    border: 2px solid #333;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+button, .button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    display: block;
+    text-decoration: none;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+button:active, .button:active {
+    background: #555;
+}
+.info {
+    background: #e8f4f8;
+    border: 2px solid #4a90a4;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 13px;
+}
+.status {
+    background: #fff9e6;
+    border: 2px solid #d4a017;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 13px;
+}
+.success {
+    background: #e8f8e8;
+    border: 2px solid #4a904a;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 13px;
+}
+.error {
+    background: #f8e8e8;
+    border: 2px solid #a44a4a;
+    padding: 10px;
+    margin: 10px 0;
+    font-size: 13px;
+    color: #a44a4a;
+}
+ul {
+    margin: 5px 0;
+    padding-left: 20px;
+}
+li {
+    margin: 3px 0;
+    font-size: 13px;
+}
+p {
+    margin: 8px 0;
+    line-height: 1.4;
+}
+.center {
+    text-align: center;
+}
+hr {
+    border: none;
+    border-top: 2px solid #333;
+    margin: 15px 0;
+}
+input[type="radio"] {
+    margin-right: 5px;
+}
+label {
+    font-size: 13px;
+    margin-right: 15px;
+}
+a {
+    color: #4a90a4;
+    text-decoration: underline;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Navigation -->
+<div style="background: #333; padding: 8px; margin: -15px -15px 15px -15px;">
+  <div style="text-align: center;">
+    <a href="/" style="color: white; text-decoration: none; margin: 0 5px; font-size: 13px;">[Home]</a>
+    <a href="/search" style="color: white; text-decoration: none; margin: 0 5px; font-size: 13px;">[Search]</a>
+    <a href="/split_tool" style="color: white; text-decoration: none; margin: 0 5px; font-size: 13px;">[Split]</a>
+    <a href="/history" style="color: white; text-decoration: none; margin: 0 5px; font-size: 13px;">[History]</a>
+    <a href="/cookies" style="color: white; text-decoration: none; margin: 0 5px; font-size: 13px;">[Cookies]</a>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+    <div class="error">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+{% block content %}{% endblock %}
+</div>
+</body>
+</html>

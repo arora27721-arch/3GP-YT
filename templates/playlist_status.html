@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Playlist Conversion Status{% endblock %}
+
+{% block meta %}
+{% if playlist.status == 'processing' %}
+<meta http-equiv="refresh" content="30">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<h1>Playlist Conversion Status</h1>
+
+{% if playlist.status == 'processing' %}
+<div class="status">
+<p class="center"><strong>[...] PROCESSING PLAYLIST</strong></p>
+<p class="center" style="font-size: 16px; font-weight: bold;">Please Wait - Converting Videos</p>
+</div>
+
+<div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>PLAYLIST INFO</strong></p>
+<ul style="list-style: none; padding: 0;">
+<li><strong>Playlist:</strong> {{ playlist.playlist_title }}</li>
+<li><strong>Total Videos:</strong> {{ playlist.total_videos }}</li>
+<li><strong>Completed:</strong> {{ playlist.completed_count }} / {{ playlist.total_videos }}</li>
+<li><strong>Failed:</strong> {{ playlist.failed_count }}</li>
+<li><strong>Format:</strong> {{ playlist.format|upper }}</li>
+</ul>
+</div>
+
+<div style="margin: 15px 0;">
+<p class="center" style="margin-bottom: 5px;"><strong>Overall Progress: {{ ((playlist.completed_count + playlist.failed_count) / playlist.total_videos * 100)|round(1) }}%</strong></p>
+<div style="width: 100%; background: #ddd; border: 2px solid #333; height: 25px;">
+<div style="width: {{ ((playlist.completed_count + playlist.failed_count) / playlist.total_videos * 100)|round(1) }}%; background: #4a904a; height: 100%; transition: width 0.3s;"></div>
+</div>
+</div>
+
+<div class="success" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>[i] This page auto-refreshes every 30 seconds</strong></p>
+<p class="center">Download links will appear when all videos are processed</p>
+</div>
+
+<form method="GET" action="/playlist/status/{{ playlist_id }}">
+<button type="submit">[>] Check Status Now</button>
+</form>
+
+<h2 style="margin-top: 20px;">Video Progress:</h2>
+{% if playlist.videos %}
+<div style="max-height: 400px; overflow-y: auto; background: #f5f5f5; padding: 10px; border-radius: 5px;">
+{% for video_id, video in playlist.videos.items() %}
+<div style="padding: 10px; margin: 5px 0; background: white; border: 1px solid #ddd; border-radius: 3px;">
+<p style="margin: 0; font-weight: bold;">{{ video.index }}. {{ video.title }}</p>
+<p style="margin: 5px 0 0 0; font-size: 14px; color: {% if video.status == 'completed' %}#4a904a{% elif video.status == 'failed' %}#a44a4a{% else %}#4a90a4{% endif %};">
+Status: {{ video.status|upper }}
+{% if video.status == 'failed' and video.error %} - {{ video.error }}{% endif %}
+</p>
+</div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% elif playlist.status == 'completed' %}
+<div class="success">
+<p class="center"><strong>[OK] PLAYLIST CONVERSION COMPLETE!</strong></p>
+<p class="center" style="font-size: 16px; font-weight: bold;">{{ playlist.completed_count }} videos converted successfully</p>
+{% if playlist.failed_count > 0 %}
+<p class="center" style="color: #d4a017;">{{ playlist.failed_count }} videos failed to convert</p>
+{% endif %}
+</div>
+
+<div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>DOWNLOAD YOUR FILES</strong></p>
+<p class="center">Click on each video below to download</p>
+</div>
+
+<h2 style="margin-top: 20px;">Download Converted Files:</h2>
+{% if playlist.videos %}
+<div style="max-height: 500px; overflow-y: auto;">
+{% for video_id, video in playlist.videos.items() %}
+{% if video.status == 'completed' %}
+<div style="background: white; border: 2px solid #4a904a; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+<p style="font-size: 16px; font-weight: bold; margin: 0 0 10px 0;">
+{{ video.index }}. {{ video.title }}
+</p>
+<a href="/download/{{ video_id }}" class="button" style="background: #4a904a; font-size: 16px; padding: 12px; margin-top: 10px;">
+>> DOWNLOAD {{ playlist.format|upper }}
+</a>
+</div>
+{% elif video.status == 'failed' %}
+<div style="background: white; border: 2px solid #a44a4a; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+<p style="font-size: 16px; font-weight: bold; margin: 0 0 10px 0; color: #a44a4a;">
+{{ video.index }}. {{ video.title }}
+</p>
+<p style="font-size: 14px; color: #666; margin: 0;">
+<strong>Status:</strong> Failed - {{ video.error or 'Unknown error' }}
+</p>
+</div>
+{% endif %}
+{% endfor %}
+</div>
+{% else %}
+<p class="center">No videos available for download</p>
+{% endif %}
+
+<div class="info">
+<p class="center"><strong>[!] IMPORTANT:</strong></p>
+<ul>
+<li>All files expire in 6 hours</li>
+<li>Download them as soon as possible</li>
+<li>Each file can be split for easier downloading</li>
+</ul>
+<p class="center" style="margin-top: 10px;"><strong>Bookmark this page to access files later</strong></p>
+</div>
+
+<hr style="margin: 30px 0;">
+<a href="/" class="button">Convert Another Playlist/Video</a>
+
+{% elif playlist.status == 'failed' %}
+<div class="error">
+<p class="center"><strong>[X] PLAYLIST CONVERSION FAILED</strong></p>
+<p class="center">{{ playlist.error or 'Unknown error occurred' }}</p>
+</div>
+
+<a href="/" class="button" style="background: #a44a4a;">[>] Try Again</a>
+
+{% else %}
+<div class="error">
+<p class="center">Playlist not found or expired</p>
+</div>
+
+<a href="/" class="button">Go Home</a>
+{% endif %}
+
+{% endblock %}

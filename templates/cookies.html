@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Cookie Management{% endblock %}
+
+{% block content %}
+<h1>Cookie Management</h1>
+
+<div class="info">
+<p class="center"><strong>Cookie Status:</strong></p>
+{% if cookies_exist %}
+<p class="center">[OK] Cookies uploaded</p>
+{% if is_valid %}
+<p class="center" style="color: #4a904a;">Valid YouTube cookies detected</p>
+{% else %}
+<p class="center" style="color: #a44a4a;">{{ validation_message }}</p>
+{% endif %}
+{% else %}
+<p class="center" style="color: #a44a4a;">No cookies uploaded</p>
+{% endif %}
+</div>
+
+<hr>
+
+<h2>Why Cookies?</h2>
+<div class="info">
+<p><strong>Cookies are OPTIONAL.</strong> The server uses 7 different download methods to work without cookies. Upload cookies only if downloads fail repeatedly.</p>
+<p><strong>Benefits of cookies:</strong></p>
+<ul>
+<li>Fixes "sign in required" errors</li>
+<li>Bypasses rate limits on cloud hosting</li>
+<li>Better success rate for restricted videos</li>
+<li>No YouTube login needed in app</li>
+</ul>
+</div>
+
+<hr>
+
+<h2>How to Export Cookies</h2>
+<div class="info">
+<p><strong>Step 1:</strong> Install browser extension</p>
+<ul>
+<li><strong>Chrome/Edge:</strong> Get "Get cookies.txt LOCALLY" extension</li>
+<li><strong>Firefox:</strong> Get "cookies.txt" extension</li>
+</ul>
+
+<p><strong>Step 2:</strong> Go to YouTube.com</p>
+<p>(No need to log in - just visit youtube.com)</p>
+
+<p><strong>Step 3:</strong> Click extension icon</p>
+<p>Click "Export" or "Download"</p>
+
+<p><strong>Step 4:</strong> Save as cookies.txt</p>
+<p>Upload the file below</p>
+</div>
+
+<hr>
+
+<h2>Upload Cookies</h2>
+<form method="POST" enctype="multipart/form-data">
+<p><strong>Select cookies.txt file:</strong></p>
+<input type="file" name="cookies_file" accept=".txt" required style="margin-bottom: 10px; width: 100%; padding: 8px; box-sizing: border-box;">
+<button type="submit">Upload Cookies</button>
+</form>
+
+{% if cookies_exist %}
+<hr>
+<h2>Delete Cookies</h2>
+<form method="POST">
+<input type="hidden" name="delete_cookies" value="1">
+<button type="submit" style="background: #a44a4a;">Delete Current Cookies</button>
+</form>
+{% endif %}
+
+<hr>
+
+<a href="/" class="button">Back to Home</a>
+
+<div class="info">
+<p class="center"><strong>Privacy Note:</strong></p>
+<p class="center">Cookies are stored securely on this server only. They are never shared or transmitted elsewhere.</p>
+</div>
+
+{% endblock %}
