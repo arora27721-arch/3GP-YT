@@ -66,6 +66,64 @@ MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '10G'))  # 10GB for
 PLAYLIST_STATUS_FILE = '/tmp/playlist_status.json'
 playlist_status_lock = threading.Lock()
 
+# Split job storage for background processing
+SPLIT_STATUS_FILE = '/tmp/split_status.json'
+split_status_lock = threading.Lock()
+
+# Active job tracking for keep-alive during processing
+active_jobs = {'count': 0, 'last_activity': time.time()}
+active_jobs_lock = threading.Lock()
+
+def register_active_job():
+    """Register an active job to prevent Render sleep"""
+    with active_jobs_lock:
+        active_jobs['count'] += 1
+        active_jobs['last_activity'] = time.time()
+        logger.debug(f"Active jobs: {active_jobs['count']}")
+
+def unregister_active_job():
+    """Unregister a completed job"""
+    with active_jobs_lock:
+        active_jobs['count'] = max(0, active_jobs['count'] - 1)
+        active_jobs['last_activity'] = time.time()
+        logger.debug(f"Active jobs: {active_jobs['count']}")
+
+def has_active_jobs():
+    """Check if there are active jobs"""
+    with active_jobs_lock:
+        return active_jobs['count'] > 0
+
+def get_split_status(split_id):
+    """Get status for a split job"""
+    with split_status_lock:
+        if os.path.exists(SPLIT_STATUS_FILE):
+            try:
+                with open(SPLIT_STATUS_FILE, 'r') as f:
+                    all_status = json.load(f)
+                    return all_status.get(split_id, {})
+            except:
+                return {}
+        return {}
+
+def update_split_status(split_id, updates):
+    """Update status for a split job"""
+    with split_status_lock:
+        all_status = {}
+        if os.path.exists(SPLIT_STATUS_FILE):
+            try:
+                with open(SPLIT_STATUS_FILE, 'r') as f:
+                    all_status = json.load(f)
+            except:
+                pass
+        
+        if split_id not in all_status:
+            all_status[split_id] = {}
+        all_status[split_id].update(updates)
+        all_status[split_id]['updated_at'] = datetime.now().isoformat()
+        
+        with open(SPLIT_STATUS_FILE, 'w') as f:
+            json.dump(all_status, f)
+
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
 PROXY_URL = os.environ.get('PROXY_URL', '')  # Optional: http://user:pass@proxy:port
@@ -2356,121 +2414,211 @@ def get_file_info(file_path):
 
     return info
 
-def split_media_file(file_path, num_parts, file_id):
+def split_media_file_background(file_path, num_parts, file_id, split_id):
     """
-    Split media file (MP3 or 3GP) into specified number of parts.
-    Optimized for Render free tier with stream copy for MP3 (very fast, no CPU-heavy re-encoding).
+    Background worker for splitting media files.
+    Updates status in real-time for progress tracking.
+    Optimized for Render free tier with stream copy for MP3.
     """
-    if not os.path.exists(file_path):
-        return None
+    register_active_job()
+    
+    try:
+        if not os.path.exists(file_path):
+            update_split_status(split_id, {
+                'status': 'error',
+                'error': 'File not found',
+                'completed_parts': 0,
+                'total_parts': num_parts
+            })
+            return
 
-    ext = os.path.splitext(file_path)[1].lower()
+        ext = os.path.splitext(file_path)[1].lower()
+        info = get_file_info(file_path)
+        total_duration = info['duration_seconds']
 
-    info = get_file_info(file_path)
-    total_duration = info['duration_seconds']
+        if total_duration == 0:
+            update_split_status(split_id, {
+                'status': 'error',
+                'error': 'Could not determine file duration',
+                'completed_parts': 0,
+                'total_parts': num_parts
+            })
+            return
 
-    if total_duration == 0:
-        logger.warning(f"Could not get duration for media split: {file_path}")
-        return None
-
-    duration_per_part = total_duration / num_parts
-
-    if duration_per_part < 10:
-        logger.warning(f"Parts would be too short ({duration_per_part}s), adjusting...")
-        num_parts = max(2, int(total_duration / 10))
         duration_per_part = total_duration / num_parts
 
-    parts = []
-    part_num = 1
-    start_time = 0
+        if duration_per_part < 10:
+            num_parts = max(2, int(total_duration / 10))
+            duration_per_part = total_duration / num_parts
 
-    logger.info(f"Splitting {file_path} into {num_parts} parts (each ~{int(duration_per_part)}s)")
+        update_split_status(split_id, {
+            'status': 'processing',
+            'total_parts': num_parts,
+            'completed_parts': 0,
+            'current_part': 1,
+            'file_id': file_id,
+            'format': ext.replace('.', '').upper()
+        })
 
-    while start_time < total_duration and part_num <= num_parts:
-        part_filename = f"{file_id}_part{part_num}{ext}"
-        part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
+        parts = []
+        part_num = 1
+        start_time = 0
 
-        if part_num == num_parts:
-            part_duration = total_duration - start_time
-        else:
-            part_duration = duration_per_part
+        logger.info(f"[SPLIT {split_id}] Starting split of {file_path} into {num_parts} parts")
 
-        if ext == '.mp3':
-            # MP3: Use stream copy (VERY fast, no re-encoding, minimal CPU)
-            # This is the key optimization for Render free tier
-            ffmpeg_cmd = [
-                '-threads', '1',
-                '-ss', str(start_time),
-                '-i', file_path,
-                '-t', str(part_duration),
-                '-c:a', 'copy',  # Stream copy - no re-encoding!
-                '-y',
-                part_path
-            ]
-        elif ext == '.3gp':
-            # 3GP: Must re-encode, but use veryfast preset and single thread
-            # Optimized for CPU-constrained environments like Render free tier
-            ffmpeg_cmd = [
-                '-threads', '1',
-                '-ss', str(start_time),
-                '-i', file_path,
-                '-t', str(part_duration),
-                '-c:v', 'libx264',
-                '-preset', 'veryfast',
-                '-crf', '28',
-                '-vf', 'scale=176:144:force_original_aspect_ratio=decrease',
-                '-b:v', '150k',
-                '-maxrate', '200k',
-                '-bufsize', '100k',
-                '-r', '12',
-                '-c:a', 'aac',
-                '-b:a', '64k',
-                '-ar', '22050',
-                '-ac', '1',
-                '-movflags', '+faststart',
-                '-max_muxing_queue_size', '1024',
-                '-f', '3gp',
-                '-y',
-                part_path
-            ]
-        else:
-            logger.error(f"Unsupported format for splitting: {ext}")
-            return None
+        while start_time < total_duration and part_num <= num_parts:
+            part_filename = f"{file_id}_part{part_num}{ext}"
+            part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
 
-        try:
-            logger.info(f"Creating part {part_num}/{num_parts} from {start_time}s to {start_time + part_duration}s...")
-            result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=600)
-
-            if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
-                parts.append({
-                    'filename': part_filename,
-                    'path': part_path,
-                    'size': os.path.getsize(part_path),
-                    'part_num': part_num
-                })
-                logger.info(f"Successfully created part {part_num} ({os.path.getsize(part_path)} bytes)")
+            if part_num == num_parts:
+                part_duration = total_duration - start_time
             else:
-                logger.error(f"Failed to create part {part_num}:")
-                logger.error(f"STDOUT: {result.stdout}")
-                logger.error(f"STDERR: {result.stderr}")
-                break
+                part_duration = duration_per_part
 
-        except subprocess.TimeoutExpired:
-            logger.error(f"Timeout while creating part {part_num}")
-            break
-        except Exception as e:
-            logger.error(f"Error splitting media part {part_num}: {str(e)}")
-            break
+            update_split_status(split_id, {
+                'current_part': part_num,
+                'current_part_progress': 'encoding'
+            })
 
-        start_time += part_duration
-        part_num += 1
+            if ext == '.mp3':
+                # MP3: Re-encode with proper settings for feature phone compatibility
+                # Uses single thread and efficient settings for Render free tier
+                ffmpeg_cmd = [
+                    '-threads', '1',
+                    '-ss', str(start_time),
+                    '-i', file_path,
+                    '-t', str(part_duration),
+                    '-c:a', 'libmp3lame',
+                    '-b:a', '128k',
+                    '-ar', '44100',
+                    '-ac', '2',
+                    '-write_xing', '0',
+                    '-y',
+                    part_path
+                ]
+            elif ext == '.3gp':
+                # 3GP: Re-encode with H.264 + AAC for maximum feature phone compatibility
+                # Uses ultrafast preset and single thread for Render free tier CPU limits
+                ffmpeg_cmd = [
+                    '-threads', '1',
+                    '-ss', str(start_time),
+                    '-i', file_path,
+                    '-t', str(part_duration),
+                    '-c:v', 'libx264',
+                    '-preset', 'ultrafast',
+                    '-crf', '28',
+                    '-vf', 'scale=176:144:force_original_aspect_ratio=decrease',
+                    '-b:v', '150k',
+                    '-maxrate', '200k',
+                    '-bufsize', '100k',
+                    '-r', '12',
+                    '-c:a', 'aac',
+                    '-b:a', '64k',
+                    '-ar', '22050',
+                    '-ac', '1',
+                    '-movflags', '+faststart',
+                    '-max_muxing_queue_size', '1024',
+                    '-f', '3gp',
+                    '-y',
+                    part_path
+                ]
+            else:
+                update_split_status(split_id, {
+                    'status': 'error',
+                    'error': f'Unsupported format: {ext}'
+                })
+                return
 
-    return parts if len(parts) > 0 else None
+            try:
+                logger.info(f"[SPLIT {split_id}] Creating part {part_num}/{num_parts} (re-encoding for feature phones)")
+                result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=900)
+
+                if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
+                    part_info = {
+                        'filename': part_filename,
+                        'path': part_path,
+                        'size': os.path.getsize(part_path),
+                        'size_human': f"{os.path.getsize(part_path) / (1024 * 1024):.2f} MB",
+                        'part_num': part_num
+                    }
+                    parts.append(part_info)
+                    
+                    update_split_status(split_id, {
+                        'completed_parts': part_num,
+                        'parts': parts
+                    })
+                    logger.info(f"[SPLIT {split_id}] Completed part {part_num}/{num_parts}")
+                else:
+                    error_msg = result.stderr[:200] if result.stderr else 'Unknown FFmpeg error'
+                    update_split_status(split_id, {
+                        'status': 'error',
+                        'error': f'Failed to create part {part_num}: {error_msg}',
+                        'parts': parts
+                    })
+                    logger.error(f"[SPLIT {split_id}] Failed part {part_num}: {error_msg}")
+                    return
+
+            except subprocess.TimeoutExpired:
+                update_split_status(split_id, {
+                    'status': 'error',
+                    'error': f'Timeout creating part {part_num} (took too long)',
+                    'parts': parts
+                })
+                return
+            except Exception as e:
+                update_split_status(split_id, {
+                    'status': 'error',
+                    'error': f'Error on part {part_num}: {str(e)[:100]}',
+                    'parts': parts
+                })
+                return
+
+            start_time += part_duration
+            part_num += 1
+
+        # All parts completed - include file_id for download link
+        update_split_status(split_id, {
+            'status': 'completed',
+            'completed_parts': len(parts),
+            'parts': parts,
+            'file_id': file_id,
+            'download_url': f'/split_downloads/{file_id}'
+        })
+        logger.info(f"[SPLIT {split_id}] All {len(parts)} parts completed successfully")
+
+    except Exception as e:
+        update_split_status(split_id, {
+            'status': 'error',
+            'error': str(e)[:200]
+        })
+        logger.error(f"[SPLIT {split_id}] Fatal error: {e}")
+    finally:
+        unregister_active_job()
+
+def start_split_job(file_path, num_parts, file_id):
+    """Start a background split job and return the split_id for tracking"""
+    split_id = f"split_{file_id}_{int(time.time())}"
+    
+    update_split_status(split_id, {
+        'status': 'starting',
+        'file_id': file_id,
+        'total_parts': num_parts,
+        'completed_parts': 0,
+        'started_at': datetime.now().isoformat()
+    })
+    
+    thread = threading.Thread(
+        target=split_media_file_background,
+        args=(file_path, num_parts, file_id, split_id),
+        daemon=True
+    )
+    thread.start()
+    
+    return split_id
 
 @app.route('/split/<file_id>', methods=['POST'])
 def split_file(file_id):
-    """Handle file splitting requests"""
-    # Find the file
+    """Handle file splitting requests - starts background job"""
     file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
     file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
 
@@ -2483,33 +2631,38 @@ def split_file(file_id):
         flash('File not found or has been deleted')
         return redirect(url_for('status', file_id=file_id))
 
-    # Get number of parts requested
     try:
         num_parts = int(request.form.get('num_parts', 2))
-
-        # Validate range
         if num_parts < 2 or num_parts > 50:
             flash('Number of parts must be between 2 and 50')
             return redirect(url_for('status', file_id=file_id))
 
-        # Split with proper re-encoding for feature phones
-        flash('Splitting file... This may take a few minutes as each part is being properly encoded for feature phone compatibility.')
-        parts = split_media_file(file_path, num_parts, file_id)
+        # Start background job
+        split_id = start_split_job(file_path, num_parts, file_id)
+        return redirect(url_for('split_progress', split_id=split_id))
 
-        if parts:
-            flash(f'File split into {len(parts)} parts successfully! Each part has been properly encoded and will play on feature phones.')
-            return redirect(url_for('split_downloads', file_id=file_id))
-        else:
-            flash('Failed to split file. Please try with fewer parts or check the logs.')
-            return redirect(url_for('status', file_id=file_id))
-
-    except ValueError as e:
+    except ValueError:
         flash('Invalid number of parts. Please enter a valid number.')
         return redirect(url_for('status', file_id=file_id))
     except Exception as e:
-        logger.error(f"Error splitting file: {str(e)}")
-        flash('An error occurred while splitting the file.')
+        logger.error(f"Error starting split: {str(e)}")
+        flash('An error occurred while starting the split.')
         return redirect(url_for('status', file_id=file_id))
+
+@app.route('/split_progress/<split_id>')
+def split_progress(split_id):
+    """Show split progress page with real-time updates"""
+    status = get_split_status(split_id)
+    if not status:
+        flash('Split job not found')
+        return redirect(url_for('split_tool'))
+    return render_template('split_progress.html', split_id=split_id, status=status)
+
+@app.route('/split_status_api/<split_id>')
+def split_status_api(split_id):
+    """JSON API endpoint for split status polling"""
+    status = get_split_status(split_id)
+    return jsonify(status)
 
 @app.route('/split_downloads/<file_id>')
 def split_downloads(file_id):
@@ -2609,19 +2762,12 @@ def split_tool():
             return redirect(url_for('split_tool'))
 
         try:
-            # Split with proper re-encoding for feature phones
-            flash('Splitting file... This may take a few minutes as each part is being properly encoded for feature phone compatibility.')
-            parts = split_media_file(file_path, num_parts, file_id)
-
-            if parts:
-                flash(f'File split into {len(parts)} parts successfully! Each part has been properly encoded and will play on feature phones.')
-                return redirect(url_for('split_downloads', file_id=file_id))
-            else:
-                flash('Failed to split file. Please try with fewer parts or check the logs.')
-                return redirect(url_for('split_tool'))
+            # Start background job and redirect to progress page
+            split_id = start_split_job(file_path, num_parts, file_id)
+            return redirect(url_for('split_progress', split_id=split_id))
         except Exception as e:
-            logger.error(f"Error splitting file: {str(e)}")
-            flash('An error occurred while splitting the file.')
+            logger.error(f"Error starting split: {str(e)}")
+            flash('An error occurred while starting the split.')
             return redirect(url_for('split_tool'))
 
     # GET request - show available files
@@ -2920,16 +3066,27 @@ KEEP_ALIVE_INTERVAL = int(os.environ.get('KEEP_ALIVE_INTERVAL', 300))  # 5 minut
 PUBLIC_URL = os.environ.get('PUBLIC_URL', os.environ.get('RENDER_EXTERNAL_URL', ''))
 
 def keep_alive_ping():
-    """Background thread that pings the app to keep it alive on Render free tier"""
+    """Background thread that pings the app to keep it alive on Render free tier.
+    Pings more frequently during active jobs to prevent timeout."""
     while KEEP_ALIVE_ENABLED:
         try:
-            time.sleep(KEEP_ALIVE_INTERVAL)
+            # Use shorter interval during active jobs
+            if has_active_jobs():
+                sleep_time = 60  # Ping every 60 seconds during active work
+            else:
+                sleep_time = KEEP_ALIVE_INTERVAL
+            
+            time.sleep(sleep_time)
+            
             if PUBLIC_URL:
                 health_url = f"{PUBLIC_URL.rstrip('/')}/health"
                 try:
                     response = requests.get(health_url, timeout=30)
                     if response.status_code == 200:
-                        logger.debug(f"Keep-alive ping successful to {health_url}")
+                        if has_active_jobs():
+                            logger.info(f"Keep-alive (active job): ping successful")
+                        else:
+                            logger.debug(f"Keep-alive ping successful")
                     else:
                         logger.warning(f"Keep-alive ping returned {response.status_code}")
                 except requests.RequestException as e:

@@ -11,18 +11,32 @@ This app is optimized for **Render's free tier** with smart resource management.
 
 ## 🎯 Optimizations Made
 
-### 1. **CPU Thread Limiting**
+### 1. **Keep-Alive System (Prevents Sleep)**
+- Background thread pings `/health` endpoint every 5 minutes
+- Pings every 60 seconds during active jobs (downloads, splitting, conversions)
+- Set `PUBLIC_URL` or uses `RENDER_EXTERNAL_URL` automatically
+- Prevents Render free tier from sleeping during long operations
+
+### 2. **Background Job Processing**
+- File splitting runs in background threads (not blocking requests)
+- Real-time progress tracking with dedicated progress page
+- Jobs continue even if browser is closed
+- Activity-based keep-alive ensures jobs complete
+
+### 3. **CPU Thread Limiting**
 - All FFmpeg processes limited to **1 thread** (`-threads 1`)
 - OpenMP threads also limited (`OMP_NUM_THREADS=1`)
 - Prevents CPU monopolization on shared 0.1 vCPU
 
-### 2. **Smart Resource Limits**
+### 4. **Smart Resource Limits**
 ```bash
 MAX_VIDEO_DURATION=1800        # 30 minutes max (fits in 15-min timeout)
 MAX_FILESIZE=500M              # 500MB limit (512MB RAM available)
 SUBTITLE_MAX_DURATION_MINS=45  # 45 minutes for subtitle burning
 SUBTITLE_MAX_FILESIZE_MB=300   # 300MB max for subtitle burning
 FFMPEG_THREADS=1               # Single-threaded FFmpeg
+KEEP_ALIVE_ENABLED=true        # Keep app awake
+KEEP_ALIVE_INTERVAL=300        # Ping every 5 minutes
 ```
 
 ### 3. **User Choice Preservation**
