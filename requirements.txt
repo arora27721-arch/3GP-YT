@@ -4,9 +4,3 @@ gunicorn==21.2.0
 Flask==3.0.0
 gunicorn==21.2.0
 yt-dlp>=2025.10.22
-Flask
-gunicorn
-yt-dlp
-Flask==3.0.0
-gunicorn==21.2.0
-yt-dlp>=2025.10.22

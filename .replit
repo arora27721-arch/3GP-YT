@@ -1,10 +1,10 @@
-modules = ["python-3.12", "web", "bash"]
+modules = ["web", "bash", "python-3.11"]
 [agent]
 expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["dejavu_fonts", "ffmpeg-full", "imagemagick", "imagemagickBig", "liberation_ttf", "ffmpeg"]
+packages = ["dejavu_fonts", "ffmpeg", "ffmpeg-full", "imagemagick", "imagemagickBig", "liberation_ttf"]
 
 [workflows]
 runButton = "Project"
@@ -53,3 +53,7 @@ externalPort = 80
 [[ports]]
 localPort = 8000
 externalPort = 8000
+
+[[ports]]
+localPort = 33049
+externalPort = 3000
