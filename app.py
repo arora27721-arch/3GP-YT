@@ -9,10 +9,15 @@ import logging
 import secrets
 import re
 import gc
+import requests
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, jsonify
 import hashlib
 import yt_dlp
+
+# Set environment variables for reduced CPU usage on free tier hosting
+os.environ.setdefault('OMP_NUM_THREADS', '1')
+os.environ.setdefault('UV_THREADPOOL_SIZE', '4')
 
 # Configure logging
 logging.basicConfig(
@@ -153,11 +158,10 @@ VIDEO_QUALITY_PRESETS = {
 
 # Detect FFmpeg path (for Render free tier compatibility)
 def download_ffmpeg_binary():
-    """Auto-download FFmpeg if not found - helps discover Render's actual paths"""
+    """Auto-download FFmpeg using Python requests (no wget dependency)"""
     try:
         logger.info("FFmpeg not found in expected locations. Attempting auto-download...")
 
-        # Try downloading to /tmp first (always writable)
         download_dir = '/tmp/bin'
         os.makedirs(download_dir, exist_ok=True)
 
@@ -165,32 +169,34 @@ def download_ffmpeg_binary():
         download_path = os.path.join(download_dir, 'ffmpeg-static.tar.xz')
 
         logger.info(f"Downloading FFmpeg from {ffmpeg_url}...")
-        result = subprocess.run(['wget', '-O', download_path, ffmpeg_url], 
-                              capture_output=True, timeout=120)
-
-        if result.returncode == 0 and os.path.exists(download_path):
+        
+        try:
+            response = requests.get(ffmpeg_url, stream=True, timeout=120)
+            response.raise_for_status()
+            
+            with open(download_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
             logger.info(f"Download successful! Extracting to {download_dir}...")
             subprocess.run(['tar', '-xJf', download_path, '-C', download_dir, '--strip-components=1'],
-                         timeout=60)
+                         timeout=120, check=True)
             os.remove(download_path)
 
             ffmpeg_binary = os.path.join(download_dir, 'ffmpeg')
             if os.path.exists(ffmpeg_binary):
                 os.chmod(ffmpeg_binary, 0o755)
                 logger.info(f"✓ FFmpeg auto-downloaded successfully to: {ffmpeg_binary}")
-                logger.info(f"✓ DISCOVERED PATH: {ffmpeg_binary} (use this in your config!)")
                 return ffmpeg_binary
+                
+        except requests.RequestException as e:
+            logger.warning(f"Download via requests failed: {e}")
 
-        logger.warning("Auto-download failed, trying system package manager...")
-        # Try apt-get as last resort (works on some systems)
-        subprocess.run(['apt-get', 'update'], capture_output=True, timeout=30)
-        subprocess.run(['apt-get', 'install', '-y', 'ffmpeg'], capture_output=True, timeout=120)
-
-        return 'ffmpeg'  # Hope it's now in PATH
+        return 'ffmpeg'
 
     except Exception as e:
         logger.error(f"Auto-download failed: {e}")
-        return 'ffmpeg'  # Fallback to system PATH
+        return 'ffmpeg'
 
 def get_ffmpeg_path():
     """Find FFmpeg binary - checks multiple locations, auto-downloads if needed"""
@@ -2352,15 +2358,14 @@ def get_file_info(file_path):
 
 def split_media_file(file_path, num_parts, file_id):
     """
-    Split media file (MP3 or 3GP) into specified number of parts with proper re-encoding.
-    This ensures each part is a complete, playable media file compatible with feature phones.
+    Split media file (MP3 or 3GP) into specified number of parts.
+    Optimized for Render free tier with stream copy for MP3 (very fast, no CPU-heavy re-encoding).
     """
     if not os.path.exists(file_path):
         return None
 
     ext = os.path.splitext(file_path)[1].lower()
 
-    # Get total duration
     info = get_file_info(file_path)
     total_duration = info['duration_seconds']
 
@@ -2368,10 +2373,8 @@ def split_media_file(file_path, num_parts, file_id):
         logger.warning(f"Could not get duration for media split: {file_path}")
         return None
 
-    # Calculate duration per part
     duration_per_part = total_duration / num_parts
 
-    # Minimum 10 seconds per part
     if duration_per_part < 10:
         logger.warning(f"Parts would be too short ({duration_per_part}s), adjusting...")
         num_parts = max(2, int(total_duration / 10))
@@ -2387,45 +2390,45 @@ def split_media_file(file_path, num_parts, file_id):
         part_filename = f"{file_id}_part{part_num}{ext}"
         part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
 
-        # Calculate actual duration for this part (last part gets remaining time)
         if part_num == num_parts:
             part_duration = total_duration - start_time
         else:
             part_duration = duration_per_part
 
-        # Build FFmpeg command with proper re-encoding for feature phones
         if ext == '.mp3':
-            # MP3 audio: re-encode with simple, compatible settings
+            # MP3: Use stream copy (VERY fast, no re-encoding, minimal CPU)
+            # This is the key optimization for Render free tier
             ffmpeg_cmd = [
-                '-threads', str(FFMPEG_THREADS),
+                '-threads', '1',
                 '-ss', str(start_time),
                 '-i', file_path,
                 '-t', str(part_duration),
-                '-c:a', 'libmp3lame',
-                '-b:a', '128k',
-                '-ar', '44100',
-                '-ac', '2',
-                '-write_xing', '0',
+                '-c:a', 'copy',  # Stream copy - no re-encoding!
                 '-y',
                 part_path
             ]
         elif ext == '.3gp':
-            # 3GP video: re-encode with H.263 video + AMR-NB audio for maximum feature phone compatibility
-            # AMR-NB (Adaptive Multi-Rate Narrowband) is the standard audio codec for 3GP on feature phones
+            # 3GP: Must re-encode, but use veryfast preset and single thread
+            # Optimized for CPU-constrained environments like Render free tier
             ffmpeg_cmd = [
-               '-threads', str(FFMPEG_THREADS),
+                '-threads', '1',
                 '-ss', str(start_time),
                 '-i', file_path,
                 '-t', str(part_duration),
-                '-c:v', 'h263',
-                '-vf', 'scale=320:240:force_original_aspect_ratio=increase,setsar=1',
-                '-b:v', '300k',
-                '-r', '15',
-                '-g', '15',
-                '-c:a', 'libopencore_amrnb',
-                '-b:a', '192k',
-                '-ar', '44100',
+                '-c:v', 'libx264',
+                '-preset', 'veryfast',
+                '-crf', '28',
+                '-vf', 'scale=176:144:force_original_aspect_ratio=decrease',
+                '-b:v', '150k',
+                '-maxrate', '200k',
+                '-bufsize', '100k',
+                '-r', '12',
+                '-c:a', 'aac',
+                '-b:a', '64k',
+                '-ar', '22050',
                 '-ac', '1',
+                '-movflags', '+faststart',
+                '-max_muxing_queue_size', '1024',
                 '-f', '3gp',
                 '-y',
                 part_path
@@ -2436,7 +2439,7 @@ def split_media_file(file_path, num_parts, file_id):
 
         try:
             logger.info(f"Creating part {part_num}/{num_parts} from {start_time}s to {start_time + part_duration}s...")
-            result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=None)
+            result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=600)
 
             if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
                 parts.append({
@@ -2901,6 +2904,51 @@ def cookies_page():
                          is_valid=is_valid, 
                          validation_message=message)
 
+# Health check endpoint for Render and monitoring services
+@app.route('/health')
+def health_check():
+    """Simple health check endpoint - keeps app alive on Render free tier"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'service': 'youtube-3gp-converter'
+    }), 200
+
+# Keep-alive system for Render free tier (prevents 15-min spin-down)
+KEEP_ALIVE_ENABLED = os.environ.get('KEEP_ALIVE_ENABLED', 'true').lower() == 'true'
+KEEP_ALIVE_INTERVAL = int(os.environ.get('KEEP_ALIVE_INTERVAL', 300))  # 5 minutes default
+PUBLIC_URL = os.environ.get('PUBLIC_URL', os.environ.get('RENDER_EXTERNAL_URL', ''))
+
+def keep_alive_ping():
+    """Background thread that pings the app to keep it alive on Render free tier"""
+    while KEEP_ALIVE_ENABLED:
+        try:
+            time.sleep(KEEP_ALIVE_INTERVAL)
+            if PUBLIC_URL:
+                health_url = f"{PUBLIC_URL.rstrip('/')}/health"
+                try:
+                    response = requests.get(health_url, timeout=30)
+                    if response.status_code == 200:
+                        logger.debug(f"Keep-alive ping successful to {health_url}")
+                    else:
+                        logger.warning(f"Keep-alive ping returned {response.status_code}")
+                except requests.RequestException as e:
+                    logger.warning(f"Keep-alive ping failed: {e}")
+            else:
+                logger.debug("Keep-alive: No PUBLIC_URL configured, skipping external ping")
+        except Exception as e:
+            logger.error(f"Keep-alive error: {e}")
+
+def start_keep_alive():
+    """Start the keep-alive background thread"""
+    if KEEP_ALIVE_ENABLED and PUBLIC_URL:
+        keep_alive_thread = threading.Thread(target=keep_alive_ping, daemon=True)
+        keep_alive_thread.start()
+        logger.info(f"Keep-alive started: pinging {PUBLIC_URL} every {KEEP_ALIVE_INTERVAL}s")
+    elif KEEP_ALIVE_ENABLED:
+        logger.info("Keep-alive enabled but no PUBLIC_URL configured - set PUBLIC_URL or RENDER_EXTERNAL_URL")
+
 if __name__ == '__main__':
+    start_keep_alive()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
