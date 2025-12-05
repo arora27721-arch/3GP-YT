@@ -1899,7 +1899,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             'filename': filename_with_ext,
             'file_size': final_size,
             'duration': duration,
-            'completed_at': datetime.now().isoformat()
+            'completed_at': datetime.now().isoformat(),
+            'quality': quality,
+            'output_format': output_format
         })
 
     except subprocess.TimeoutExpired:
@@ -2414,11 +2416,11 @@ def get_file_info(file_path):
 
     return info
 
-def split_media_file_background(file_path, num_parts, file_id, split_id):
+def split_media_file_background(file_path, num_parts, file_id, split_id, quality=None, output_format=None):
     """
     Background worker for splitting media files.
     Updates status in real-time for progress tracking.
-    Optimized for Render free tier with stream copy for MP3.
+    Uses the same quality preset as the original conversion.
     """
     register_active_job()
     
@@ -2451,13 +2453,35 @@ def split_media_file_background(file_path, num_parts, file_id, split_id):
             num_parts = max(2, int(total_duration / 10))
             duration_per_part = total_duration / num_parts
 
+        # Get the quality preset from the original conversion
+        if ext == '.mp3':
+            if quality and quality in MP3_QUALITY_PRESETS:
+                quality_preset = MP3_QUALITY_PRESETS[quality]
+                logger.info(f"[SPLIT {split_id}] Using original quality preset: {quality}")
+            else:
+                quality_preset = MP3_QUALITY_PRESETS['medium']
+                logger.warning(f"[SPLIT {split_id}] Quality '{quality}' not found in status, using default 'medium' for MP3")
+        elif ext == '.3gp':
+            if quality and quality in VIDEO_QUALITY_PRESETS:
+                quality_preset = VIDEO_QUALITY_PRESETS[quality]
+                logger.info(f"[SPLIT {split_id}] Using original quality preset: {quality}")
+            else:
+                quality_preset = VIDEO_QUALITY_PRESETS['low']
+                logger.warning(f"[SPLIT {split_id}] Quality '{quality}' not found in status, using default 'low' for 3GP")
+        else:
+            quality_preset = None
+            logger.warning(f"[SPLIT {split_id}] Unknown file extension: {ext}")
+        
+        quality_name = quality_preset['name'] if quality_preset else 'Unknown'
+
         update_split_status(split_id, {
             'status': 'processing',
             'total_parts': num_parts,
             'completed_parts': 0,
             'current_part': 1,
             'file_id': file_id,
-            'format': ext.replace('.', '').upper()
+            'format': ext.replace('.', '').upper(),
+            'quality': quality_name
         })
 
         parts = []
@@ -2481,24 +2505,28 @@ def split_media_file_background(file_path, num_parts, file_id, split_id):
             })
 
             if ext == '.mp3':
-                # MP3: Re-encode with proper settings for feature phone compatibility
-                # Uses single thread and efficient settings for Render free tier
+                # MP3: Re-encode with the SAME quality settings as original conversion
                 ffmpeg_cmd = [
                     '-threads', '1',
                     '-ss', str(start_time),
                     '-i', file_path,
                     '-t', str(part_duration),
                     '-c:a', 'libmp3lame',
-                    '-b:a', '128k',
-                    '-ar', '44100',
+                    '-ar', quality_preset['sample_rate'],
+                    '-b:a', quality_preset['bitrate'],
+                    '-q:a', quality_preset['vbr_quality'],
                     '-ac', '2',
                     '-write_xing', '0',
                     '-y',
                     part_path
                 ]
             elif ext == '.3gp':
-                # 3GP: Re-encode with H.264 + AAC for maximum feature phone compatibility
-                # Uses ultrafast preset and single thread for Render free tier CPU limits
+                # 3GP: Re-encode with the SAME quality settings as original conversion
+                # Calculate appropriate buffer sizes based on bitrate
+                video_bitrate_num = int(quality_preset['video_bitrate'].replace('k', ''))
+                maxrate = f"{int(video_bitrate_num * 1.5)}k"
+                bufsize = f"{int(video_bitrate_num * 0.75)}k"
+                
                 ffmpeg_cmd = [
                     '-threads', '1',
                     '-ss', str(start_time),
@@ -2506,15 +2534,14 @@ def split_media_file_background(file_path, num_parts, file_id, split_id):
                     '-t', str(part_duration),
                     '-c:v', 'libx264',
                     '-preset', 'ultrafast',
-                    '-crf', '28',
-                    '-vf', 'scale=176:144:force_original_aspect_ratio=decrease',
-                    '-b:v', '150k',
-                    '-maxrate', '200k',
-                    '-bufsize', '100k',
-                    '-r', '12',
+                    '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2',
+                    '-r', quality_preset['fps'],
+                    '-b:v', quality_preset['video_bitrate'],
+                    '-maxrate', maxrate,
+                    '-bufsize', bufsize,
                     '-c:a', 'aac',
-                    '-b:a', '64k',
-                    '-ar', '22050',
+                    '-ar', quality_preset['audio_sample_rate'],
+                    '-b:a', quality_preset['audio_bitrate'],
                     '-ac', '1',
                     '-movflags', '+faststart',
                     '-max_muxing_queue_size', '1024',
@@ -2530,7 +2557,7 @@ def split_media_file_background(file_path, num_parts, file_id, split_id):
                 return
 
             try:
-                logger.info(f"[SPLIT {split_id}] Creating part {part_num}/{num_parts} (re-encoding for feature phones)")
+                logger.info(f"[SPLIT {split_id}] Creating part {part_num}/{num_parts} (quality: {quality_name})")
                 result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=900)
 
                 if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
@@ -2595,8 +2622,16 @@ def split_media_file_background(file_path, num_parts, file_id, split_id):
     finally:
         unregister_active_job()
 
-def start_split_job(file_path, num_parts, file_id):
-    """Start a background split job and return the split_id for tracking"""
+def start_split_job(file_path, num_parts, file_id, quality=None, output_format=None):
+    """Start a background split job and return the split_id for tracking.
+    
+    Args:
+        file_path: Path to the media file to split
+        num_parts: Number of parts to split into
+        file_id: The file identifier
+        quality: Quality preset key (e.g., 'low', 'medium', 'high') - uses same settings as original conversion
+        output_format: Format type ('mp3' or '3gp')
+    """
     split_id = f"split_{file_id}_{int(time.time())}"
     
     update_split_status(split_id, {
@@ -2609,7 +2644,7 @@ def start_split_job(file_path, num_parts, file_id):
     
     thread = threading.Thread(
         target=split_media_file_background,
-        args=(file_path, num_parts, file_id, split_id),
+        args=(file_path, num_parts, file_id, split_id, quality, output_format),
         daemon=True
     )
     thread.start()
@@ -2623,22 +2658,29 @@ def split_file(file_id):
     file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
 
     file_path = None
+    output_format = None
     if os.path.exists(file_path_3gp):
         file_path = file_path_3gp
+        output_format = '3gp'
     elif os.path.exists(file_path_mp3):
         file_path = file_path_mp3
+        output_format = 'mp3'
     else:
         flash('File not found or has been deleted')
         return redirect(url_for('status', file_id=file_id))
 
+    # Get the original quality from the conversion status
+    file_status = get_status().get(file_id, {})
+    quality = file_status.get('quality')
+    
     try:
         num_parts = int(request.form.get('num_parts', 2))
         if num_parts < 2 or num_parts > 50:
             flash('Number of parts must be between 2 and 50')
             return redirect(url_for('status', file_id=file_id))
 
-        # Start background job
-        split_id = start_split_job(file_path, num_parts, file_id)
+        # Start background job with same quality as original conversion
+        split_id = start_split_job(file_path, num_parts, file_id, quality=quality, output_format=output_format)
         return redirect(url_for('split_progress', split_id=split_id))
 
     except ValueError:
@@ -2748,10 +2790,13 @@ def split_tool():
         file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
 
         file_path = None
+        output_format = None
         if os.path.exists(file_path_3gp):
             file_path = file_path_3gp
+            output_format = '3gp'
         elif os.path.exists(file_path_mp3):
             file_path = file_path_mp3
+            output_format = 'mp3'
         else:
             flash('File not found or has been deleted')
             return redirect(url_for('split_tool'))
@@ -2761,9 +2806,13 @@ def split_tool():
             flash('Invalid file path')
             return redirect(url_for('split_tool'))
 
+        # Get the original quality from the conversion status
+        file_status = get_status().get(file_id, {})
+        quality = file_status.get('quality')
+
         try:
-            # Start background job and redirect to progress page
-            split_id = start_split_job(file_path, num_parts, file_id)
+            # Start background job with same quality as original conversion
+            split_id = start_split_job(file_path, num_parts, file_id, quality=quality, output_format=output_format)
             return redirect(url_for('split_progress', split_id=split_id))
         except Exception as e:
             logger.error(f"Error starting split: {str(e)}")
