@@ -55,12 +55,12 @@ def parse_filesize(size_str):
             return int(float(size_str[:-1]) * multiplier)
     return int(size_str)
 
-# Resource limits optimized for Google Cloud Shell (4 vCPUs, 16GB RAM, generous storage)
+# Resource limits optimized for Render free tier (512MB RAM, limited CPU, sleep after 15min inactivity)
 # Can be overridden via environment variables for different deployment environments
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 864000))  # 24 hours (unlimited for Cloud Shell)
-DOWNLOAD_TIMEOUT = None  # Unlimited download timeout (network timeouts handled by yt-dlp)
-FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 240))  # 24 hours retention
-MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '10G'))  # 10GB for Cloud Shell (generous storage)
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 360000))  # 1 hour max for Render free tier
+DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 600))  # 10 min timeout for downloads
+FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 20))  # 2 hours retention (Render has limited storage)
+MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '5000M'))  # 500MB for Render free tier
 
 # Playlist storage
 PLAYLIST_STATUS_FILE = '/tmp/playlist_status.json'
@@ -129,20 +129,23 @@ USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
 PROXY_URL = os.environ.get('PROXY_URL', '')  # Optional: http://user:pass@proxy:port
 USE_OAUTH = os.environ.get('USE_OAUTH', 'false').lower() == 'true'
 
-# Advanced performance settings - optimized for Cloud Shell's generous resources
-RATE_LIMIT_BYTES = int(os.environ.get('RATE_LIMIT_BYTES', 0))  # 0 = unlimited (Cloud Shell has fast network)
-MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 4))  # 4 concurrent for Cloud Shell
+# Advanced performance settings - optimized for Render free tier (512MB RAM, limited CPU)
+RATE_LIMIT_BYTES = int(os.environ.get('RATE_LIMIT_BYTES', 0))  # 0 = unlimited
+MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))  # 1 concurrent for Render free tier
 ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 'true').lower() == 'true'
-DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 50))  # 500MB threshold for Cloud Shell
+DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 100))  # 100MB threshold for Render
 
-# Subtitle burning settings - optimized for Google Cloud Shell (4 vCPUs, 16GB RAM)
-# Unlimited duration and size for Cloud Shell's generous resources
-SUBTITLE_MAX_DURATION_MINS = int(os.environ.get('SUBTITLE_MAX_DURATION_MINS', 144000)) if os.environ.get('SUBTITLE_MAX_DURATION_MINS') else None  # 24 hours
-SUBTITLE_MAX_FILESIZE_MB = int(os.environ.get('SUBTITLE_MAX_FILESIZE_MB', 10000)) if os.environ.get('SUBTITLE_MAX_FILESIZE_MB') else None  # 10GB
+# Subtitle burning settings - optimized for Render free tier (512MB RAM)
+SUBTITLE_MAX_DURATION_MINS = int(os.environ.get('SUBTITLE_MAX_DURATION_MINS', 3000))  # 30 min max for subtitles on Render
+SUBTITLE_MAX_FILESIZE_MB = int(os.environ.get('SUBTITLE_MAX_FILESIZE_MB', 200))  # 200MB max for subtitle burning
 ENABLE_SUBTITLE_BURNING = os.environ.get('ENABLE_SUBTITLE_BURNING', 'true').lower() == 'true'
 
-# FFmpeg performance settings - optimized for Cloud Shell's 4 vCPUs
-FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))  # Use all 4 vCPUs on Cloud Shell
+# FFmpeg performance settings - optimized for Render free tier (limited CPU)
+FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))  # 1 thread for Render free tier
+
+# Playlist processing settings for Render free tier
+PLAYLIST_MAX_VIDEOS = int(os.environ.get('PLAYLIST_MAX_VIDEOS', 10))  # Max 10 videos per playlist on free tier
+PLAYLIST_VIDEO_TIMEOUT = int(os.environ.get('PLAYLIST_VIDEO_TIMEOUT', 300))  # 5 min timeout per video
 
 # Quality presets for MP3 audio conversion
 # Note: Minimum 128kbps to avoid YouTube download errors with low bitrate
@@ -427,39 +430,102 @@ def extract_playlist_info(url):
     return {'is_playlist': False}
 
 def process_playlist(playlist_id, url, output_format, quality, burn_subtitles=False):
-    """Background thread function to process all videos in a playlist"""
+    """Background thread function to process all videos in a playlist
+    Optimized for Render free tier with proper timeouts and limits.
+    """
+    register_active_job()
+    
     try:
         status = get_playlist_status()
         playlist_data = status.get(playlist_id, {})
         videos = playlist_data.get('videos', {})
-
-        for video_id, video_info in videos.items():
+        
+        # Limit videos for Render free tier
+        video_items = list(videos.items())
+        if len(video_items) > PLAYLIST_MAX_VIDEOS:
+            logger.warning(f"Playlist has {len(video_items)} videos, limiting to {PLAYLIST_MAX_VIDEOS}")
+            update_playlist_status(playlist_id, {
+                'warning': f'Processing first {PLAYLIST_MAX_VIDEOS} videos only (Render free tier limit)'
+            })
+            video_items = video_items[:PLAYLIST_MAX_VIDEOS]
+        
+        processed_count = 0
+        
+        for video_id, video_info in video_items:
             if video_info.get('status') == 'pending':
+                # Check disk space before each video
+                if ENABLE_DISK_SPACE_MONITORING:
+                    has_space, free_mb = check_disk_space()
+                    if not has_space:
+                        logger.warning(f"Low disk space ({free_mb:.0f}MB), attempting cleanup...")
+                        clean_tmp_immediately()
+                        has_space, free_mb = check_disk_space()
+                        if not has_space:
+                            update_playlist_status(playlist_id, {
+                                'status': 'failed',
+                                'error': f'Server storage full ({free_mb:.0f}MB free). Processed {processed_count} videos.'
+                            })
+                            return
+                
+                # Update status to processing
+                video_info['status'] = 'processing'
+                videos[video_id] = video_info
                 update_playlist_status(playlist_id, {
-                    'videos': {**videos, video_id: {**video_info, 'status': 'processing'}}
+                    'videos': videos,
+                    'current_video': video_info.get('title', 'Unknown'),
+                    'progress': f'Processing video {processed_count + 1}/{len(video_items)}'
                 })
 
                 file_id = generate_file_id(video_info['url'])
                 video_info['file_id'] = file_id
 
-                download_and_convert(video_info['url'], file_id, output_format, quality, burn_subtitles)
-
-                file_status = get_status().get(file_id, {})
-                if file_status.get('status') == 'completed':
-                    video_info['status'] = 'completed'
-                    playlist_data['completed_count'] = playlist_data.get('completed_count', 0) + 1
-                else:
+                try:
+                    # Process with timeout handling
+                    start_time = time.time()
+                    download_and_convert(video_info['url'], file_id, output_format, quality, burn_subtitles)
+                    elapsed = time.time() - start_time
+                    
+                    # Check if it took too long (potential stuck)
+                    if elapsed > PLAYLIST_VIDEO_TIMEOUT:
+                        logger.warning(f"Video {video_id} took {elapsed:.0f}s (limit: {PLAYLIST_VIDEO_TIMEOUT}s)")
+                    
+                    file_status = get_status().get(file_id, {})
+                    if file_status.get('status') == 'completed':
+                        video_info['status'] = 'completed'
+                        playlist_data['completed_count'] = playlist_data.get('completed_count', 0) + 1
+                        processed_count += 1
+                    else:
+                        video_info['status'] = 'failed'
+                        video_info['error'] = file_status.get('progress', 'Unknown error')[:100]
+                        playlist_data['failed_count'] = playlist_data.get('failed_count', 0) + 1
+                        
+                except Exception as video_error:
+                    logger.error(f"Error processing video {video_id}: {str(video_error)[:100]}")
                     video_info['status'] = 'failed'
-                    video_info['error'] = file_status.get('progress', 'Unknown error')
+                    video_info['error'] = str(video_error)[:100]
                     playlist_data['failed_count'] = playlist_data.get('failed_count', 0) + 1
 
                 videos[video_id] = video_info
-                update_playlist_status(playlist_id, {'videos': videos, 'completed_count': playlist_data.get('completed_count', 0), 'failed_count': playlist_data.get('failed_count', 0)})
+                update_playlist_status(playlist_id, {
+                    'videos': videos, 
+                    'completed_count': playlist_data.get('completed_count', 0), 
+                    'failed_count': playlist_data.get('failed_count', 0)
+                })
+                
+                # Small delay between videos to prevent resource exhaustion
+                time.sleep(1)
 
-        update_playlist_status(playlist_id, {'status': 'completed'})
+        update_playlist_status(playlist_id, {
+            'status': 'completed',
+            'progress': f'Completed! {playlist_data.get("completed_count", 0)} successful, {playlist_data.get("failed_count", 0)} failed'
+        })
+        logger.info(f"Playlist {playlist_id} completed: {playlist_data.get('completed_count', 0)} successful, {playlist_data.get('failed_count', 0)} failed")
+        
     except Exception as e:
         logger.error(f"Playlist processing error: {e}")
-        update_playlist_status(playlist_id, {'status': 'failed', 'error': str(e)})
+        update_playlist_status(playlist_id, {'status': 'failed', 'error': str(e)[:200]})
+    finally:
+        unregister_active_job()
 
 def check_disk_space():
     """Check available disk space on /tmp (Render has 2GB ephemeral storage limit)"""
@@ -505,18 +571,27 @@ def clean_tmp_immediately():
         logger.error(f"Emergency cleanup failed: {e}")
         return 0
 
+# Default FFmpeg timeout for Render free tier (5 minutes per operation)
+FFMPEG_DEFAULT_TIMEOUT = int(os.environ.get('FFMPEG_DEFAULT_TIMEOUT', 300))
+# Split timeout per part (3 minutes per part for Render free tier)
+SPLIT_PART_TIMEOUT = int(os.environ.get('SPLIT_PART_TIMEOUT', 180))
+
 def run_ffmpeg(args, timeout=None, **kwargs):
     """
     Centralized FFmpeg wrapper that injects CPU/thread limits for Render free tier.
     
     Args:
         args: List of FFmpeg arguments (WITHOUT the ffmpeg binary path)
-        timeout: Optional timeout in seconds
+        timeout: Optional timeout in seconds (defaults to FFMPEG_DEFAULT_TIMEOUT)
         **kwargs: Additional subprocess.run arguments
     
     Returns:
         subprocess.CompletedProcess result
     """
+    # Use default timeout if not specified (prevents hanging on Render)
+    if timeout is None:
+        timeout = FFMPEG_DEFAULT_TIMEOUT
+    
     # Build command with thread limiting for CPU-constrained environments
     cmd = [
         FFMPEG_PATH,
@@ -537,11 +612,12 @@ def get_video_duration(file_path):
             '-of', 'default=noprint_wrappers=1:nokey=1',
             file_path
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=None)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
             return float(result.stdout.strip())
         return 0
-    except:
+    except Exception as e:
+        logger.warning(f"Could not get video duration: {e}")
         return 0
 
 def has_cookies():
@@ -1752,7 +1828,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             convert_cmd = [
                 '-threads', str(FFMPEG_THREADS),
                 '-i', temp_video,
-                '-vf','scale=320:240:force_original_aspect_ratio=increase,setsar=1',
+                '-vf','scale=176:144:force_original_aspect_ratio=increase,setsar=1',
                 '-vcodec', 'mpeg4',
                 '-r', quality_preset['fps'],  # FPS from preset
                 '-b:v', quality_preset['video_bitrate'],  # Video bitrate from preset
@@ -1804,7 +1880,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                 simple_cmd = [
                    '-threads', str(FFMPEG_THREADS),
                     '-i', temp_video,
-                    '-vf', 'scale=320:240:force_original_aspect_ratio=increase,setsar=1',
+                    '-vf', 'scale=176:144:force_original_aspect_ratio=increase,setsar=1',
                     '-vcodec', 'mpeg4',
                     '-r', quality_preset['fps'],  # Use selected quality
                     '-b:v', quality_preset['video_bitrate'],  # Use selected quality
@@ -2558,7 +2634,7 @@ def split_media_file_background(file_path, num_parts, file_id, split_id, quality
 
             try:
                 logger.info(f"[SPLIT {split_id}] Creating part {part_num}/{num_parts} (quality: {quality_name})")
-                result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=900)
+                result = run_ffmpeg(ffmpeg_cmd, capture_output=True, text=True, timeout=SPLIT_PART_TIMEOUT)
 
                 if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
                     part_info = {
