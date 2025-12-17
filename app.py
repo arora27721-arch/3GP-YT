@@ -55,12 +55,12 @@ def parse_filesize(size_str):
             return int(float(size_str[:-1]) * multiplier)
     return int(size_str)
 
-# Resource limits optimized for Render free tier (512MB RAM, limited CPU, sleep after 15min inactivity)
+# Resource limits optimized for Render free tier (512MB RAM, 0.1 CPU, 2GB storage, sleep after 15min inactivity)
 # Can be overridden via environment variables for different deployment environments
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 360000))  # 1 hour max for Render free tier
-DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 600))  # 10 min timeout for downloads
-FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 20))  # 2 hours retention (Render has limited storage)
-MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '5000M'))  # 500MB for Render free tier
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 0))  # 0 = no limit (infinite)
+DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 0))  # 0 = no timeout (infinite)
+FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 24))  # 24 hours retention
+MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '2G'))  # 2GB for Render free tier
 
 # Playlist storage
 PLAYLIST_STATUS_FILE = '/tmp/playlist_status.json'
@@ -69,6 +69,128 @@ playlist_status_lock = threading.Lock()
 # Split job storage for background processing
 SPLIT_STATUS_FILE = '/tmp/split_status.json'
 split_status_lock = threading.Lock()
+
+# Search settings storage
+SEARCH_SETTINGS_FILE = '/tmp/search_settings.json'
+search_settings_lock = threading.Lock()
+
+# Default search settings
+DEFAULT_SEARCH_SETTINGS = {
+    'duration': 'any',
+    'upload_date': 'any',
+    'sort_by': 'relevance',
+    'content_type': 'video',
+    'quality': 'any',
+    'subtitles': False,
+    'creative_commons': False,
+    'live': False,
+    '3d': False,
+    'vr180': False,
+    'purchased': False,
+    'results_count': 10,
+    'safe_search': 'moderate',
+    'region': 'auto',
+    'min_views': 0
+}
+
+def get_search_settings():
+    """Get current search filter settings"""
+    with search_settings_lock:
+        if os.path.exists(SEARCH_SETTINGS_FILE):
+            try:
+                with open(SEARCH_SETTINGS_FILE, 'r') as f:
+                    settings = json.load(f)
+                    merged = DEFAULT_SEARCH_SETTINGS.copy()
+                    merged.update(settings)
+                    return merged
+            except:
+                return DEFAULT_SEARCH_SETTINGS.copy()
+        return DEFAULT_SEARCH_SETTINGS.copy()
+
+def save_search_settings(settings):
+    """Save search filter settings"""
+    with search_settings_lock:
+        with open(SEARCH_SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f)
+
+def build_yt_search_query(query, settings):
+    """Build yt-dlp search query with filters applied"""
+    results_count = settings.get('results_count', 10)
+    
+    search_prefix = f"ytsearch{results_count}:"
+    
+    duration_map = {
+        'short': 'short',
+        'medium': 'medium', 
+        'long': 'long',
+        'verylong': 'long'
+    }
+    
+    upload_map = {
+        'hour': 'hour',
+        'today': 'today',
+        'week': 'week',
+        'month': 'month',
+        'year': 'year'
+    }
+    
+    sort_map = {
+        'upload_date': 'date',
+        'view_count': 'viewCount',
+        'rating': 'rating'
+    }
+    
+    content_type_map = {
+        'playlist': 'playlist',
+        'channel': 'channel'
+    }
+    
+    filters = []
+    
+    duration = settings.get('duration', 'any')
+    if duration in duration_map:
+        filters.append(f"duration={duration_map[duration]}")
+    
+    upload_date = settings.get('upload_date', 'any')
+    if upload_date in upload_map:
+        filters.append(f"upload_date={upload_map[upload_date]}")
+    
+    sort_by = settings.get('sort_by', 'relevance')
+    if sort_by in sort_map:
+        filters.append(f"sort={sort_map[sort_by]}")
+    
+    content_type = settings.get('content_type', 'video')
+    if content_type in content_type_map:
+        filters.append(f"type={content_type_map[content_type]}")
+    
+    quality = settings.get('quality', 'any')
+    if quality == 'hd':
+        filters.append("hd=true")
+    elif quality == 'fullhd':
+        filters.append("hd=true")
+    elif quality == '4k':
+        filters.append("4k=true")
+    
+    if settings.get('subtitles'):
+        filters.append("subtitles=true")
+    if settings.get('creative_commons'):
+        filters.append("creative_commons=true")
+    if settings.get('live'):
+        filters.append("live=true")
+    if settings.get('3d'):
+        filters.append("3d=true")
+    if settings.get('vr180'):
+        filters.append("vr180=true")
+    if settings.get('purchased'):
+        filters.append("purchased=true")
+    
+    if filters:
+        filter_str = ",".join(filters)
+        search_query = f"{search_prefix}{query}"
+    else:
+        search_query = f"{search_prefix}{query}"
+    
+    return search_query, settings
 
 # Active job tracking for keep-alive during processing
 active_jobs = {'count': 0, 'last_activity': time.time()}
@@ -129,23 +251,23 @@ USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
 PROXY_URL = os.environ.get('PROXY_URL', '')  # Optional: http://user:pass@proxy:port
 USE_OAUTH = os.environ.get('USE_OAUTH', 'false').lower() == 'true'
 
-# Advanced performance settings - optimized for Render free tier (512MB RAM, limited CPU)
+# Advanced performance settings - optimized for Render free tier (512MB RAM, 0.1 CPU, 2GB storage)
 RATE_LIMIT_BYTES = int(os.environ.get('RATE_LIMIT_BYTES', 0))  # 0 = unlimited
-MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))  # 1 concurrent for Render free tier
+MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))  # 1 concurrent for Render free tier (0.1 CPU)
 ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 'true').lower() == 'true'
-DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 100))  # 100MB threshold for Render
+DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 50))  # 50MB threshold (2GB storage on Render)
 
-# Subtitle burning settings - optimized for Render free tier (512MB RAM)
-SUBTITLE_MAX_DURATION_MINS = int(os.environ.get('SUBTITLE_MAX_DURATION_MINS', 3000))  # 30 min max for subtitles on Render
-SUBTITLE_MAX_FILESIZE_MB = int(os.environ.get('SUBTITLE_MAX_FILESIZE_MB', 200))  # 200MB max for subtitle burning
+# Subtitle burning settings - optimized for Render free tier (512MB RAM, 0.1 CPU)
+SUBTITLE_MAX_DURATION_MINS = int(os.environ.get('SUBTITLE_MAX_DURATION_MINS', 0))  # 0 = no limit (infinite)
+SUBTITLE_MAX_FILESIZE_MB = int(os.environ.get('SUBTITLE_MAX_FILESIZE_MB', 2000))  # 2GB max for subtitle burning
 ENABLE_SUBTITLE_BURNING = os.environ.get('ENABLE_SUBTITLE_BURNING', 'true').lower() == 'true'
 
-# FFmpeg performance settings - optimized for Render free tier (limited CPU)
-FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))  # 1 thread for Render free tier
+# FFmpeg performance settings - optimized for Render free tier (0.1 CPU)
+FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))  # 1 thread for Render free tier (0.1 CPU)
 
 # Playlist processing settings for Render free tier
-PLAYLIST_MAX_VIDEOS = int(os.environ.get('PLAYLIST_MAX_VIDEOS', 10))  # Max 10 videos per playlist on free tier
-PLAYLIST_VIDEO_TIMEOUT = int(os.environ.get('PLAYLIST_VIDEO_TIMEOUT', 300))  # 5 min timeout per video
+PLAYLIST_MAX_VIDEOS = int(os.environ.get('PLAYLIST_MAX_VIDEOS', 50))  # Max videos per playlist
+PLAYLIST_VIDEO_TIMEOUT = int(os.environ.get('PLAYLIST_VIDEO_TIMEOUT', 0))  # 0 = no timeout (infinite)
 
 # Quality presets for MP3 audio conversion
 # Note: Minimum 128kbps to avoid YouTube download errors with low bitrate
@@ -400,7 +522,7 @@ def extract_playlist_info(url):
             'quiet': True,
             'extract_flat': True,
             'force_generic_extractor': False,
-            'socket_timeout': 60,
+            'socket_timeout': 0,  # 0 = no timeout (infinite)
         }
         cookiefile = get_valid_cookiefile()
         if cookiefile:
@@ -571,31 +693,33 @@ def clean_tmp_immediately():
         logger.error(f"Emergency cleanup failed: {e}")
         return 0
 
-# Default FFmpeg timeout for Render free tier (5 minutes per operation)
-FFMPEG_DEFAULT_TIMEOUT = int(os.environ.get('FFMPEG_DEFAULT_TIMEOUT', 300))
-# Split timeout per part (3 minutes per part for Render free tier)
-SPLIT_PART_TIMEOUT = int(os.environ.get('SPLIT_PART_TIMEOUT', 180))
+# Default FFmpeg timeout for Render free tier (0 = no timeout / infinite)
+FFMPEG_DEFAULT_TIMEOUT = int(os.environ.get('FFMPEG_DEFAULT_TIMEOUT', 0))  # 0 = no timeout
+# Split timeout per part (0 = no timeout / infinite for Render free tier 0.1 CPU)
+SPLIT_PART_TIMEOUT = int(os.environ.get('SPLIT_PART_TIMEOUT', 0))  # 0 = no timeout
 
 def run_ffmpeg(args, timeout=None, **kwargs):
     """
-    Centralized FFmpeg wrapper that injects CPU/thread limits for Render free tier.
+    Centralized FFmpeg wrapper that injects CPU/thread limits for Render free tier (0.1 CPU).
     
     Args:
         args: List of FFmpeg arguments (WITHOUT the ffmpeg binary path)
-        timeout: Optional timeout in seconds (defaults to FFMPEG_DEFAULT_TIMEOUT)
+        timeout: Optional timeout in seconds (0 or None = no timeout)
         **kwargs: Additional subprocess.run arguments
     
     Returns:
         subprocess.CompletedProcess result
     """
-    # Use default timeout if not specified (prevents hanging on Render)
+    # Use default timeout if not specified; 0 means no timeout (infinite)
     if timeout is None:
-        timeout = FFMPEG_DEFAULT_TIMEOUT
+        timeout = FFMPEG_DEFAULT_TIMEOUT if FFMPEG_DEFAULT_TIMEOUT > 0 else None
+    elif timeout == 0:
+        timeout = None  # 0 means no timeout
     
-    # Build command with thread limiting for CPU-constrained environments
+    # Build command with thread limiting for CPU-constrained environments (0.1 CPU)
     cmd = [
         FFMPEG_PATH,
-        '-threads', str(FFMPEG_THREADS),  # Limit FFmpeg threads
+        '-threads', str(FFMPEG_THREADS),  # Limit FFmpeg threads for 0.1 CPU
     ] + args
     
     # Also limit OpenMP threads (used by some codecs)
@@ -824,7 +948,7 @@ def download_subtitles(url, file_id, max_retries=3):
                 'outtmpl': os.path.join(DOWNLOAD_FOLDER, f'{file_id}'),
                 'quiet': True,
                 'no_warnings': True,
-                'socket_timeout': 60,  # Increased timeout
+                'socket_timeout': 0,  # 0 = no timeout (infinite)
                 'retries': 10,  # More internal retries
                 # 2025 anti-throttling/anti-bot measures
                 'sleep_interval': 2,
@@ -1407,7 +1531,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             'concurrent_fragment_downloads': 10,  # Sequential to avoid rate limits
             'ignoreerrors': False,
             'extractor_retries': 8,
-            'socket_timeout': 50,  # Longer timeout for slow cloud connections
+            'socket_timeout': 0,  # 0 = no timeout (infinite)
             'http_chunk_size': 10485760,  # 10MB
             'quiet': False,
             'no_warnings': False,
@@ -2923,46 +3047,79 @@ def split_tool():
 
     return render_template('split_tool.html', files=files)
 
+@app.route('/search/settings', methods=['GET', 'POST'])
+def search_settings():
+    """Search filter settings page"""
+    if request.method == 'POST':
+        if request.form.get('reset'):
+            save_search_settings(DEFAULT_SEARCH_SETTINGS.copy())
+            flash('Search settings reset to defaults')
+            return redirect(url_for('search_settings'))
+        
+        settings = {
+            'duration': request.form.get('duration', 'any'),
+            'upload_date': request.form.get('upload_date', 'any'),
+            'sort_by': request.form.get('sort_by', 'relevance'),
+            'content_type': request.form.get('content_type', 'video'),
+            'quality': request.form.get('quality', 'any'),
+            'subtitles': request.form.get('subtitles') == '1',
+            'creative_commons': request.form.get('creative_commons') == '1',
+            'live': request.form.get('live') == '1',
+            '3d': request.form.get('3d') == '1',
+            'vr180': request.form.get('vr180') == '1',
+            'purchased': request.form.get('purchased') == '1',
+            'results_count': int(request.form.get('results_count', 10)),
+            'safe_search': request.form.get('safe_search', 'moderate'),
+            'region': request.form.get('region', 'auto'),
+            'min_views': int(request.form.get('min_views', 0))
+        }
+        save_search_settings(settings)
+        flash('Search settings saved!')
+        return redirect(url_for('search_settings'))
+    
+    settings = get_search_settings()
+    return render_template('search_settings.html', settings=settings)
+
 @app.route('/search', methods=['GET', 'POST'])
 def search():
-    # Check if showing thumbnails (default: no, to save data on 2G)
+    settings = get_search_settings()
+    
     show_thumbnails = request.args.get('show_thumbnails', '0') == '1'
 
-    # Get query from POST (new search) or GET (thumbnail toggle)
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
     else:
         query = request.args.get('query', '').strip()
 
-    # If no query, show the search form
     if not query:
         if request.method == 'POST':
             flash('Please enter a search term')
-        return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails)
+        return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails, settings=settings)
 
-    # Execute the search (query is guaranteed to exist here)
     try:
-        # Use yt-dlp to search YouTube (no API key required)
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
             'force_generic_extractor': False,
-            'socket_timeout': 300,  # Timeout for 2G networks
+            'socket_timeout': 0,
         }
 
-        # Add cookies if available (helps with rate limiting and bot detection)
+        if settings.get('region') and settings['region'] != 'auto':
+            ydl_opts['geo_bypass_country'] = settings['region']
+
         cookiefile = get_valid_cookiefile()
         if cookiefile:
             ydl_opts['cookiefile'] = cookiefile
 
         results = []
         search_results = None
+        
+        search_query, _ = build_yt_search_query(query, settings)
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Search for up to 10 results with timeout protection
-                search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
+                search_results = ydl.extract_info(search_query, download=False)
         except yt_dlp.utils.DownloadError as e:
             error_msg = str(e)
             logger.error(f"Search DownloadError: {error_msg}")
@@ -2974,30 +3131,44 @@ def search():
                 flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
             else:
                 flash('YouTube search error. Please try again.')
-            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
+            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings)
         except Exception as e:
             logger.error(f"Search extraction error: {str(e)}")
             flash('Search failed. Please try again later.')
-            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
+            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings)
 
-        # Process search results
         if search_results and 'entries' in search_results:
+            min_views = settings.get('min_views', 0)
+            duration_filter = settings.get('duration', 'any')
+            
             for entry in search_results['entries']:
-                if entry and entry.get('id'):  # Ensure entry has an ID
-                    duration = entry.get('duration', 0)
+                if entry and entry.get('id'):
+                    duration = entry.get('duration', 0) or 0
+                    view_count = entry.get('view_count', 0) or 0
+                    
+                    if min_views > 0 and view_count < min_views:
+                        continue
+                    
+                    if duration_filter != 'any' and duration:
+                        if duration_filter == 'short' and duration >= 240:
+                            continue
+                        elif duration_filter == 'medium' and (duration < 240 or duration >= 1200):
+                            continue
+                        elif duration_filter == 'long' and (duration < 1200 or duration >= 3600):
+                            continue
+                        elif duration_filter == 'verylong' and duration < 3600:
+                            continue
+                    
                     duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
 
-                    # Format upload date
                     upload_date = entry.get('upload_date', '')
                     upload_date_str = "Unknown"
-                    if upload_date and len(upload_date) == 8:  # Format: YYYYMMDD
+                    if upload_date and len(upload_date) == 8:
                         try:
                             upload_date_str = f"{upload_date[6:8]}/{upload_date[4:6]}/{upload_date[0:4]}"
                         except:
                             upload_date_str = "Unknown"
 
-                    # Format view count
-                    view_count = entry.get('view_count', 0)
                     if view_count:
                         if view_count >= 1000000:
                             view_str = f"{view_count/1000000:.1f}M views"
@@ -3008,24 +3179,17 @@ def search():
                     else:
                         view_str = "Unknown views"
 
-                    # FIXED: Proper URL construction for YouTube videos
-                    # yt-dlp flat extraction may return partial URLs or video IDs
                     video_id = entry.get('id', '')
                     video_url = entry.get('url', '')
 
-                    # Construct proper YouTube URL
                     if video_url and video_url.startswith('http'):
-                        # Already a full URL
                         final_url = video_url
                     elif video_id:
-                        # Construct from video ID
                         final_url = f"https://www.youtube.com/watch?v={video_id}"
                     else:
-                        # Fallback: try to extract from URL field
                         logger.warning(f"Could not determine URL for search result: {entry.get('title', 'Unknown')}")
-                        continue  # Skip this result
+                        continue
 
-                    # Get thumbnail URL (small thumbnail for 2G networks)
                     thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/default.jpg"
 
                     results.append({
@@ -3036,21 +3200,20 @@ def search():
                         'upload_date': upload_date_str,
                         'channel': entry.get('channel', entry.get('uploader', 'Unknown')),
                         'views': view_str,
+                        'view_count': view_count,
                         'thumbnail': thumbnail_url,
                     })
 
-        # Validate we got results
         if not results:
-            flash('No results found. Try different search terms.')
-            return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails)
+            flash('No results found. Try different search terms or adjust filters.')
+            return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails, settings=settings)
 
-        return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails)
+        return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails, settings=settings)
 
     except Exception as e:
-        # Catch any unexpected errors not handled by inner try-except
         logger.error(f"Unexpected search error: {str(e)}")
         flash('An unexpected error occurred. Please try again.')
-        return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
+        return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings)
 
 @app.route('/cookies', methods=['GET', 'POST'])
 def cookies_page():

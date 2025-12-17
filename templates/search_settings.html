@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Search Settings - Feature Phone{% endblock %}
+
+{% block content %}
+<h1>Search Filters</h1>
+
+<p class="center"><a href="/search">Back to Search</a></p>
+
+<form method="POST" action="/search/settings">
+<div class="info">
+<h2>Duration Filter</h2>
+<p style="font-size: 12px;">Filter videos by length:</p>
+<select name="duration" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="any" {% if settings.duration == 'any' %}selected{% endif %}>Any Duration</option>
+<option value="short" {% if settings.duration == 'short' %}selected{% endif %}>Short (&lt; 4 minutes)</option>
+<option value="medium" {% if settings.duration == 'medium' %}selected{% endif %}>Medium (4-20 minutes)</option>
+<option value="long" {% if settings.duration == 'long' %}selected{% endif %}>Long (20-60 minutes)</option>
+<option value="verylong" {% if settings.duration == 'verylong' %}selected{% endif %}>Very Long (&gt; 60 minutes)</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Upload Date</h2>
+<p style="font-size: 12px;">Filter by when uploaded:</p>
+<select name="upload_date" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="any" {% if settings.upload_date == 'any' %}selected{% endif %}>Any Time</option>
+<option value="hour" {% if settings.upload_date == 'hour' %}selected{% endif %}>Last Hour</option>
+<option value="today" {% if settings.upload_date == 'today' %}selected{% endif %}>Today</option>
+<option value="week" {% if settings.upload_date == 'week' %}selected{% endif %}>This Week</option>
+<option value="month" {% if settings.upload_date == 'month' %}selected{% endif %}>This Month</option>
+<option value="year" {% if settings.upload_date == 'year' %}selected{% endif %}>This Year</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Sort By</h2>
+<p style="font-size: 12px;">Order results by:</p>
+<select name="sort_by" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="relevance" {% if settings.sort_by == 'relevance' %}selected{% endif %}>Relevance (Default)</option>
+<option value="upload_date" {% if settings.sort_by == 'upload_date' %}selected{% endif %}>Upload Date (Newest)</option>
+<option value="view_count" {% if settings.sort_by == 'view_count' %}selected{% endif %}>View Count (Most Popular)</option>
+<option value="rating" {% if settings.sort_by == 'rating' %}selected{% endif %}>Rating (Highest Rated)</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Content Type</h2>
+<p style="font-size: 12px;">What to search for:</p>
+<select name="content_type" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="video" {% if settings.content_type == 'video' %}selected{% endif %}>Videos Only</option>
+<option value="playlist" {% if settings.content_type == 'playlist' %}selected{% endif %}>Playlists Only</option>
+<option value="channel" {% if settings.content_type == 'channel' %}selected{% endif %}>Channels Only</option>
+<option value="all" {% if settings.content_type == 'all' %}selected{% endif %}>All Types</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Video Quality</h2>
+<p style="font-size: 12px;">Minimum resolution:</p>
+<select name="quality" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="any" {% if settings.quality == 'any' %}selected{% endif %}>Any Quality</option>
+<option value="hd" {% if settings.quality == 'hd' %}selected{% endif %}>HD (720p+)</option>
+<option value="fullhd" {% if settings.quality == 'fullhd' %}selected{% endif %}>Full HD (1080p+)</option>
+<option value="4k" {% if settings.quality == '4k' %}selected{% endif %}>4K (2160p+)</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Special Filters</h2>
+<p style="font-size: 12px;">Additional options:</p>
+
+<p style="margin: 8px 0;">
+<input type="checkbox" name="subtitles" id="subtitles" value="1" {% if settings.subtitles %}checked{% endif %}>
+<label for="subtitles">Has Subtitles/CC</label>
+</p>
+
+<p style="margin: 8px 0;">
+<input type="checkbox" name="creative_commons" id="creative_commons" value="1" {% if settings.creative_commons %}checked{% endif %}>
+<label for="creative_commons">Creative Commons Only</label>
+</p>
+
+<p style="margin: 8px 0;">
+<input type="checkbox" name="live" id="live" value="1" {% if settings.live %}checked{% endif %}>
+<label for="live">Live Content Only</label>
+</p>
+
+<p style="margin: 8px 0;">
+<input type="checkbox" name="3d" id="3d" value="1" {% if settings['3d'] %}checked{% endif %}>
+<label for="3d">3D Videos Only</label>
+</p>
+
+<p style="margin: 8px 0;">
+<input type="checkbox" name="vr180" id="vr180" value="1" {% if settings.vr180 %}checked{% endif %}>
+<label for="vr180">VR180/360 Videos</label>
+</p>
+
+<p style="margin: 8px 0;">
+<input type="checkbox" name="purchased" id="purchased" value="1" {% if settings.purchased %}checked{% endif %}>
+<label for="purchased">Purchased Content</label>
+</p>
+</div>
+
+<div class="info">
+<h2>Results Per Search</h2>
+<p style="font-size: 12px;">Number of results to show:</p>
+<select name="results_count" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="5" {% if settings.results_count == 5 %}selected{% endif %}>5 results (Fastest)</option>
+<option value="10" {% if settings.results_count == 10 %}selected{% endif %}>10 results (Default)</option>
+<option value="15" {% if settings.results_count == 15 %}selected{% endif %}>15 results</option>
+<option value="20" {% if settings.results_count == 20 %}selected{% endif %}>20 results</option>
+<option value="30" {% if settings.results_count == 30 %}selected{% endif %}>30 results (Most)</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Safe Search</h2>
+<p style="font-size: 12px;">Content filtering:</p>
+<select name="safe_search" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="moderate" {% if settings.safe_search == 'moderate' %}selected{% endif %}>Moderate (Default)</option>
+<option value="strict" {% if settings.safe_search == 'strict' %}selected{% endif %}>Strict</option>
+<option value="off" {% if settings.safe_search == 'off' %}selected{% endif %}>Off</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Region/Language</h2>
+<p style="font-size: 12px;">Prefer content from:</p>
+<select name="region" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="auto" {% if settings.region == 'auto' %}selected{% endif %}>Auto-detect</option>
+<option value="US" {% if settings.region == 'US' %}selected{% endif %}>United States</option>
+<option value="GB" {% if settings.region == 'GB' %}selected{% endif %}>United Kingdom</option>
+<option value="IN" {% if settings.region == 'IN' %}selected{% endif %}>India</option>
+<option value="PH" {% if settings.region == 'PH' %}selected{% endif %}>Philippines</option>
+<option value="ID" {% if settings.region == 'ID' %}selected{% endif %}>Indonesia</option>
+<option value="NG" {% if settings.region == 'NG' %}selected{% endif %}>Nigeria</option>
+<option value="KE" {% if settings.region == 'KE' %}selected{% endif %}>Kenya</option>
+<option value="ZA" {% if settings.region == 'ZA' %}selected{% endif %}>South Africa</option>
+<option value="BR" {% if settings.region == 'BR' %}selected{% endif %}>Brazil</option>
+<option value="MX" {% if settings.region == 'MX' %}selected{% endif %}>Mexico</option>
+<option value="DE" {% if settings.region == 'DE' %}selected{% endif %}>Germany</option>
+<option value="FR" {% if settings.region == 'FR' %}selected{% endif %}>France</option>
+<option value="JP" {% if settings.region == 'JP' %}selected{% endif %}>Japan</option>
+<option value="KR" {% if settings.region == 'KR' %}selected{% endif %}>South Korea</option>
+</select>
+</div>
+
+<div class="info">
+<h2>Minimum Views</h2>
+<p style="font-size: 12px;">Only show popular videos:</p>
+<select name="min_views" style="width: 100%; padding: 5px; margin: 5px 0;">
+<option value="0" {% if settings.min_views == 0 %}selected{% endif %}>No Minimum</option>
+<option value="100" {% if settings.min_views == 100 %}selected{% endif %}>100+ views</option>
+<option value="1000" {% if settings.min_views == 1000 %}selected{% endif %}>1,000+ views</option>
+<option value="10000" {% if settings.min_views == 10000 %}selected{% endif %}>10,000+ views</option>
+<option value="100000" {% if settings.min_views == 100000 %}selected{% endif %}>100,000+ views</option>
+<option value="1000000" {% if settings.min_views == 1000000 %}selected{% endif %}>1,000,000+ views</option>
+</select>
+</div>
+
+<hr>
+
+<p style="text-align: center;">
+<button type="submit" style="padding: 10px 30px; font-size: 14px;">Save Settings</button>
+</p>
+
+<p style="text-align: center; margin-top: 10px;">
+<button type="submit" name="reset" value="1" style="padding: 8px 20px; font-size: 12px; background: #666;">Reset to Defaults</button>
+</p>
+</form>
+
+<hr>
+
+<div class="info">
+<h2>Current Active Filters:</h2>
+<ul style="font-size: 12px;">
+{% if settings.duration != 'any' %}<li>Duration: {{ settings.duration }}</li>{% endif %}
+{% if settings.upload_date != 'any' %}<li>Upload: {{ settings.upload_date }}</li>{% endif %}
+{% if settings.sort_by != 'relevance' %}<li>Sort: {{ settings.sort_by }}</li>{% endif %}
+{% if settings.content_type != 'video' %}<li>Type: {{ settings.content_type }}</li>{% endif %}
+{% if settings.quality != 'any' %}<li>Quality: {{ settings.quality }}</li>{% endif %}
+{% if settings.subtitles %}<li>Has Subtitles</li>{% endif %}
+{% if settings.creative_commons %}<li>Creative Commons</li>{% endif %}
+{% if settings.live %}<li>Live Content</li>{% endif %}
+{% if settings['3d'] %}<li>3D Videos</li>{% endif %}
+{% if settings.vr180 %}<li>VR/360 Videos</li>{% endif %}
+{% if settings.results_count != 10 %}<li>Results: {{ settings.results_count }}</li>{% endif %}
+{% if settings.region != 'auto' %}<li>Region: {{ settings.region }}</li>{% endif %}
+{% if settings.min_views > 0 %}<li>Min Views: {{ settings.min_views }}</li>{% endif %}
+{% if settings.duration == 'any' and settings.upload_date == 'any' and settings.sort_by == 'relevance' and settings.content_type == 'video' and settings.quality == 'any' and not settings.subtitles and not settings.creative_commons and not settings.live and not settings['3d'] and not settings.vr180 and settings.results_count == 10 and settings.region == 'auto' and settings.min_views == 0 %}
+<li><em>No filters active (using defaults)</em></li>
+{% endif %}
+</ul>
+</div>
+
+<p class="center"><a href="/">Back to Converter</a></p>
+{% endblock %}

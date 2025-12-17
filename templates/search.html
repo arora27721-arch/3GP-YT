@@ -11,7 +11,33 @@
 <button type="submit">Search</button>
 </form>
 
-<p class="center"><a href="/">Back to Converter</a></p>
+<p class="center">
+<a href="/search/settings" style="font-size: 12px;">Filter Settings</a> | 
+<a href="/">Back to Converter</a>
+</p>
+
+{% if settings %}
+{% set has_filters = settings.duration != 'any' or settings.upload_date != 'any' or settings.sort_by != 'relevance' or settings.content_type != 'video' or settings.quality != 'any' or settings.subtitles or settings.creative_commons or settings.live or settings['3d'] or settings.vr180 or settings.results_count != 10 or settings.region != 'auto' or settings.min_views > 0 %}
+{% if has_filters %}
+<div class="info" style="font-size: 11px; padding: 5px;">
+<strong>Active Filters:</strong>
+{% if settings.duration != 'any' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.duration }}</span>{% endif %}
+{% if settings.upload_date != 'any' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.upload_date }}</span>{% endif %}
+{% if settings.sort_by != 'relevance' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.sort_by }}</span>{% endif %}
+{% if settings.content_type != 'video' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.content_type }}</span>{% endif %}
+{% if settings.quality != 'any' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.quality }}</span>{% endif %}
+{% if settings.subtitles %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">subtitles</span>{% endif %}
+{% if settings.creative_commons %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">CC</span>{% endif %}
+{% if settings.live %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">live</span>{% endif %}
+{% if settings['3d'] %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">3D</span>{% endif %}
+{% if settings.vr180 %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">VR</span>{% endif %}
+{% if settings.results_count != 10 %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.results_count }} results</span>{% endif %}
+{% if settings.region != 'auto' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.region }}</span>{% endif %}
+{% if settings.min_views > 0 %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.min_views }}+ views</span>{% endif %}
+<br><a href="/search/settings" style="font-size: 10px;">Edit Filters</a>
+</div>
+{% endif %}
+{% endif %}
 
 <hr>
 
@@ -19,6 +45,7 @@
   {% if results|length > 0 %}
     <div class="info">
     <h2>Results for "{{ query }}":</h2>
+    <p style="font-size: 11px;">Found {{ results|length }} result(s)</p>
     <form method="GET" style="margin: 10px 0;">
     <input type="hidden" name="query" value="{{ query }}">
     {% if show_thumbnails %}
@@ -80,7 +107,7 @@
   {% else %}
     <div class="error">
     <p>No results found for "{{ query }}"</p>
-    <p>Try different search terms</p>
+    <p>Try different search terms or <a href="/search/settings">adjust your filters</a></p>
     </div>
   {% endif %}
 {% else %}
@@ -91,6 +118,7 @@
   <li>Shows title and duration</li>
   <li>Choose format and convert</li>
   <li>Works without YouTube API</li>
+  <li><a href="/search/settings">Use filters</a> to refine results</li>
   </ul>
   </div>
 {% endif %}
