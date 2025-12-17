@@ -57,8 +57,8 @@ def parse_filesize(size_str):
 
 # Resource limits optimized for Render free tier (512MB RAM, 0.1 CPU, 2GB storage, sleep after 15min inactivity)
 # Can be overridden via environment variables for different deployment environments
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 0))  # 0 = no limit (infinite)
-DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 0))  # 0 = no timeout (infinite)
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 20000000))  # 0 = no limit (infinite)
+DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 10000000))  # 0 = no timeout (infinite)
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 24))  # 24 hours retention
 MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '2G'))  # 2GB for Render free tier
 
