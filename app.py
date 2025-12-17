@@ -57,8 +57,8 @@ def parse_filesize(size_str):
 
 # Resource limits optimized for Render free tier (512MB RAM, 0.1 CPU, 2GB storage, sleep after 15min inactivity)
 # Can be overridden via environment variables for different deployment environments
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', NONE))  # 0 = no limit (infinite)
-DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', NONE))  # 0 = no timeout (infinite)
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 86400))  # 0 = no limit (infinite)
+DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))  # 0 = no timeout (infinite)
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 24))  # 24 hours retention
 MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '2G'))  # 2GB for Render free tier
 
@@ -258,7 +258,7 @@ ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 't
 DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 50))  # 50MB threshold (2GB storage on Render)
 
 # Subtitle burning settings - optimized for Render free tier (512MB RAM, 0.1 CPU)
-SUBTITLE_MAX_DURATION_MINS = int(os.environ.get('SUBTITLE_MAX_DURATION_MINS', 0))  # 0 = no limit (infinite)
+SUBTITLE_MAX_DURATION_MINS = int(os.environ.get('SUBTITLE_MAX_DURATION_MINS', 246000))  # 0 = no limit (infinite)
 SUBTITLE_MAX_FILESIZE_MB = int(os.environ.get('SUBTITLE_MAX_FILESIZE_MB', 2000))  # 2GB max for subtitle burning
 ENABLE_SUBTITLE_BURNING = os.environ.get('ENABLE_SUBTITLE_BURNING', 'true').lower() == 'true'
 
@@ -267,7 +267,7 @@ FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))  # 1 thread for Render
 
 # Playlist processing settings for Render free tier
 PLAYLIST_MAX_VIDEOS = int(os.environ.get('PLAYLIST_MAX_VIDEOS', 50))  # Max videos per playlist
-PLAYLIST_VIDEO_TIMEOUT = int(os.environ.get('PLAYLIST_VIDEO_TIMEOUT', 0))  # 0 = no timeout (infinite)
+PLAYLIST_VIDEO_TIMEOUT = int(os.environ.get('PLAYLIST_VIDEO_TIMEOUT', 862400))  # 0 = no timeout (infinite)
 
 # Quality presets for MP3 audio conversion
 # Note: Minimum 128kbps to avoid YouTube download errors with low bitrate
@@ -522,7 +522,7 @@ def extract_playlist_info(url):
             'quiet': True,
             'extract_flat': True,
             'force_generic_extractor': False,
-            'socket_timeout': NONE,  # 0 = no timeout (infinite)
+            'socket_timeout': 60,  # 0 = no timeout (infinite)
         }
         cookiefile = get_valid_cookiefile()
         if cookiefile:
@@ -948,7 +948,7 @@ def download_subtitles(url, file_id, max_retries=3):
                 'outtmpl': os.path.join(DOWNLOAD_FOLDER, f'{file_id}'),
                 'quiet': True,
                 'no_warnings': True,
-                'socket_timeout': 0,  # 0 = no timeout (infinite)
+                'socket_timeout': 60,  # 0 = no timeout (infinite)
                 'retries': 10,  # More internal retries
                 # 2025 anti-throttling/anti-bot measures
                 'sleep_interval': 2,
@@ -1531,7 +1531,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             'concurrent_fragment_downloads': 10,  # Sequential to avoid rate limits
             'ignoreerrors': False,
             'extractor_retries': 8,
-            'socket_timeout': 0,  # 0 = no timeout (infinite)
+            'socket_timeout': 60,  # 0 = no timeout (infinite)
             'http_chunk_size': 10485760,  # 10MB
             'quiet': False,
             'no_warnings': False,
@@ -3102,7 +3102,7 @@ def search():
             'no_warnings': True,
             'extract_flat': True,
             'force_generic_extractor': False,
-            'socket_timeout': 0,
+            'socket_timeout': 60,
         }
 
         if settings.get('region') and settings['region'] != 'auto':
