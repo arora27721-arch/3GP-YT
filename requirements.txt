@@ -1,0 +1,10 @@
+Flask==3.0.0
+yt-dlp>=2025.10.22
+gunicorn==21.2.0
+
+# For keep-alive and FFmpeg download
+requests
+Flask==3.0.0
+gunicorn==21.2.0
+requests
+yt-dlp

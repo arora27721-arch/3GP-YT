@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Conversion Status{% endblock %}
+
+{% block meta %}
+{% if file_status.status == 'downloading' or file_status.status == 'converting' or file_status.status == 'burning_subtitles' %}
+<meta http-equiv="refresh" content="30">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<h1>Conversion Status</h1>
+
+{% if file_status.status == 'downloading' or file_status.status == 'converting' or file_status.status == 'burning_subtitles' %}
+<div class="status">
+<p class="center"><strong>[...] PROCESSING YOUR VIDEO...</strong></p>
+<p class="center" style="font-size: 16px; font-weight: bold;">Please Wait</p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<div class="info">
+<p class="center"><strong>[?] How long will this take?</strong></p>
+<ul>
+<li><strong>5-10 min video:</strong> 1-3 minutes</li>
+<li><strong>30-60 min video:</strong> 5-15 minutes</li>
+<li><strong>2-3 hour video:</strong> 30-90 minutes</li>
+<li><strong>4-6 hour video:</strong> 2-4 hours</li>
+</ul>
+</div>
+
+<div class="success" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>[i] This page auto-refreshes every 30 seconds</strong></p>
+<p class="center">Download button appears when ready</p>
+<p class="center"><em>You can close this tab and come back later</em></p>
+</div>
+
+<form method="GET" action="/status/{{ file_id }}">
+<button type="submit">[>] Check Status Now</button>
+</form>
+
+{% elif file_status.status == 'completed' %}
+<div class="success">
+<p class="center"><strong>[OK] READY TO DOWNLOAD!</strong></p>
+<p class="center" style="font-size: 16px; font-weight: bold;">Your file is ready</p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+{% if file_info %}
+<div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>FILE INFO</strong></p>
+<ul style="list-style: none; padding: 0;">
+<li><strong>Size:</strong> {{ file_info.size_human }}</li>
+<li><strong>Duration:</strong> {{ file_info.duration_human }}</li>
+<li><strong>Format:</strong> {{ file_info.format }}</li>
+</ul>
+</div>
+{% endif %}
+
+<a href="/download/{{ file_id }}" class="button" style="background: #4a904a; font-size: 18px; padding: 15px; margin-bottom: 10px;">>> DOWNLOAD FULL FILE</a>
+
+<div class="info" style="background: #fff9e6; border-color: #d4a017;">
+<p class="center"><strong>[*] SPLIT FILE FOR EASIER DOWNLOAD</strong></p>
+<p class="center" style="font-size: 14px;">Split large files into smaller parts - perfect for 2G networks!</p>
+
+<form method="POST" action="/split/{{ file_id }}" style="margin-top: 15px;">
+<fieldset style="border: 2px solid #d4a017; padding: 10px; margin-bottom: 10px;">
+<legend style="font-weight: bold; padding: 0 5px;">Split into Parts:</legend>
+
+<div style="margin: 10px 0;">
+<label style="font-size: 14px; display: block; margin-bottom: 10px;">
+<strong>Number of parts (2-50):</strong>
+<input type="number" name="num_parts" value="5" min="2" max="50" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
+</label>
+{% if file_info %}
+<p style="font-size: 12px; color: #666;">
+Split {{ file_info.size_human }} file ({{ file_info.duration_human }}) into equal parts
+</p>
+{% endif %}
+</div>
+
+<div style="background: #fffacd; padding: 10px; margin-top: 10px; border: 1px solid #d4a017; border-radius: 3px;">
+<p style="font-size: 13px; font-weight: bold; margin: 0 0 5px 0; color: #8b6914;">⏱ IMPORTANT:</p>
+<p style="font-size: 12px; margin: 0; line-height: 1.4; color: #333;">
+Each part is properly re-encoded for feature phone compatibility. This takes time (a few minutes) but ensures every part plays correctly on your phone.
+</p>
+</div>
+</fieldset>
+
+<button type="submit" class="button" style="background: #d4a017; font-size: 18px; padding: 15px; width: 100%;">
+[*] SPLIT FILE NOW
+</button>
+</form>
+
+<p class="center" style="font-size: 12px; margin-top: 10px; color: #666;">
+<strong>Why split?</strong> Easier to download on slow networks, can resume individual parts if interrupted, guaranteed to work on feature phones
+</p>
+</div>
+
+<div class="info">
+<p class="center"><strong>Download Tips:</strong></p>
+<ul>
+<li>[OK] File available for 6 hours</li>
+<li>[OK] Works on 2G networks</li>
+<li>[OK] Ready for feature phones</li>
+<li>[OK] Split for easier downloads</li>
+</ul>
+<p class="center" style="margin-top: 10px;"><strong>Bookmark this page to download later</strong></p>
+</div>
+
+<hr>
+<a href="/" class="button">Convert Another Video</a>
+
+{% elif file_status.status == 'failed' %}
+<div class="error">
+<p class="center"><strong>[X] CONVERSION FAILED</strong></p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<a href="/" class="button" style="background: #a44a4a;">[>] Try Again (New Video)</a>
+
+<div class="info">
+<p class="center"><strong>What to try:</strong></p>
+<ul>
+<li><strong>1.</strong> Wait 5-10 minutes and try again</li>
+<li><strong>2.</strong> Check if video is public and not deleted</li>
+<li><strong>3.</strong> Try a shorter video (under 1 hour)</li>
+<li><strong>4.</strong> Upload cookies at <a href="/cookies" style="color: #4a90a4; font-weight: bold;">/cookies page</a></li>
+<li><strong>5.</strong> Video may be age-restricted or geo-blocked</li>
+</ul>
+</div>
+
+<div class="info" style="background: #fff9e6; border-color: #d4a017;">
+<p class="center"><strong>[!] Getting blocked by YouTube?</strong></p>
+<p class="center">Upload your browser cookies to bypass blocks</p>
+<p class="center"><a href="/cookies" class="button" style="display: inline-block; width: auto; padding: 8px 15px; margin: 5px;">Go to Cookie Upload</a></p>
+</div>
+
+{% else %}
+<div class="error">
+<p class="center">Status unknown</p>
+<p>File not found or expired</p>
+</div>
+
+<a href="/" class="button">Go Home</a>
+{% endif %}
+
+{% endblock %}

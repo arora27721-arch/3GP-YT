@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Splitting File - Progress{% endblock %}
+
+{% block content %}
+<h1>Splitting File</h1>
+
+<div id="status-container">
+    <div class="info" style="background: #fff9e6; border-color: #d4a017;">
+        <p class="center"><strong id="status-title">SPLITTING IN PROGRESS...</strong></p>
+        <p class="center" style="font-size: 14px;" id="status-message">Please wait while your file is being split into parts</p>
+    </div>
+
+    <div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+        <p class="center"><strong>PROGRESS</strong></p>
+        
+        <div style="margin: 15px 0;">
+            <div style="background: #ddd; border-radius: 10px; height: 30px; overflow: hidden;">
+                <div id="progress-bar" style="background: linear-gradient(90deg, #4a904a, #6ab06a); height: 100%; width: 0%; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center;">
+                    <span id="progress-text" style="color: white; font-weight: bold; font-size: 14px;">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <p class="center" style="font-size: 16px; margin: 10px 0;">
+            <strong>Part <span id="current-part">0</span> of <span id="total-parts">{{ status.total_parts }}</span></strong>
+        </p>
+        
+        <p class="center" style="font-size: 12px; color: #666;" id="part-status">
+            Preparing to split...
+        </p>
+    </div>
+
+    <div id="error-container" style="display: none;" class="info" style="background: #ffe6e6; border-color: #d44;">
+        <p class="center" style="color: #c00;"><strong>ERROR</strong></p>
+        <p class="center" id="error-message" style="color: #c00;"></p>
+    </div>
+
+    <div id="completed-container" style="display: none;">
+        <div class="success">
+            <p class="center"><strong>[OK] SPLIT COMPLETED!</strong></p>
+            <p class="center" style="font-size: 16px;">All parts are ready for download</p>
+        </div>
+        
+        <a id="download-link" href="#" class="button" style="background: #4a904a; font-size: 18px; padding: 15px;">
+            >> DOWNLOAD ALL PARTS
+        </a>
+    </div>
+</div>
+
+<hr style="margin: 20px 0;">
+
+<div class="info">
+    <p class="center"><strong>SPLIT INFO</strong></p>
+    <ul style="list-style: none; padding: 0; font-size: 14px;">
+        <li><strong>Split ID:</strong> {{ split_id }}</li>
+        <li><strong>Format:</strong> <span id="format">{{ status.format or 'Detecting...' }}</span></li>
+        <li><strong>Total Parts:</strong> {{ status.total_parts }}</li>
+    </ul>
+</div>
+
+<p class="center" style="font-size: 12px; color: #666; margin: 15px 0;">
+    This page updates automatically. You can keep it open or bookmark it.
+</p>
+
+<a href="/split_tool" class="button" style="background: #4a90a4;"><< Back to Split Tool</a>
+<a href="/" class="button">Home</a>
+
+<script>
+const splitId = "{{ split_id }}";
+const fileId = "{{ status.file_id }}";
+let pollInterval = null;
+
+function updateProgress(data) {
+    const statusTitle = document.getElementById('status-title');
+    const statusMessage = document.getElementById('status-message');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const currentPart = document.getElementById('current-part');
+    const totalParts = document.getElementById('total-parts');
+    const partStatus = document.getElementById('part-status');
+    const errorContainer = document.getElementById('error-container');
+    const errorMessage = document.getElementById('error-message');
+    const completedContainer = document.getElementById('completed-container');
+    const downloadLink = document.getElementById('download-link');
+    const formatSpan = document.getElementById('format');
+
+    if (data.format) {
+        formatSpan.textContent = data.format;
+    }
+
+    if (data.total_parts) {
+        totalParts.textContent = data.total_parts;
+    }
+
+    if (data.current_part) {
+        currentPart.textContent = data.current_part;
+    }
+
+    const completed = data.completed_parts || 0;
+    const total = data.total_parts || 1;
+    const percent = Math.round((completed / total) * 100);
+    
+    progressBar.style.width = percent + '%';
+    progressText.textContent = percent + '%';
+
+    if (data.status === 'starting') {
+        statusTitle.textContent = 'STARTING...';
+        statusMessage.textContent = 'Initializing split operation';
+        partStatus.textContent = 'Preparing to split...';
+    } else if (data.status === 'processing') {
+        statusTitle.textContent = 'SPLITTING IN PROGRESS...';
+        statusMessage.textContent = 'Creating split parts - this may take a few minutes';
+        if (data.current_part_progress === 'encoding') {
+            partStatus.textContent = 'Encoding part ' + data.current_part + '...';
+        } else {
+            partStatus.textContent = 'Processing part ' + data.current_part + ' of ' + total;
+        }
+    } else if (data.status === 'completed') {
+        statusTitle.textContent = 'SPLIT COMPLETE!';
+        statusMessage.textContent = 'All ' + total + ' parts created successfully';
+        progressBar.style.width = '100%';
+        progressBar.style.background = 'linear-gradient(90deg, #4a904a, #6ab06a)';
+        progressText.textContent = '100%';
+        partStatus.textContent = 'All parts ready for download';
+        
+        completedContainer.style.display = 'block';
+        downloadLink.href = '/split_downloads/' + data.file_id;
+        
+        // Stop polling
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    } else if (data.status === 'error') {
+        statusTitle.textContent = 'SPLIT FAILED';
+        statusTitle.style.color = '#c00';
+        statusMessage.textContent = 'An error occurred during splitting';
+        progressBar.style.background = '#d44';
+        partStatus.textContent = 'Error occurred';
+        
+        errorContainer.style.display = 'block';
+        errorContainer.style.background = '#ffe6e6';
+        errorContainer.style.borderColor = '#d44';
+        errorMessage.textContent = data.error || 'Unknown error';
+        
+        // Stop polling
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    }
+}
+
+function pollStatus() {
+    fetch('/split_status_api/' + splitId)
+        .then(response => response.json())
+        .then(data => {
+            updateProgress(data);
+        })
+        .catch(error => {
+            console.error('Error polling status:', error);
+        });
+}
+
+// Initial update with safe JSON
+var initialStatus = {{ status|tojson|safe }};
+updateProgress(initialStatus);
+
+// Start polling every 2 seconds
+pollInterval = setInterval(pollStatus, 2000);
+
+// Also poll immediately
+setTimeout(pollStatus, 500);
+</script>
+
+{% endblock %}

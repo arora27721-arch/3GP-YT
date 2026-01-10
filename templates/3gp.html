@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}3GP Converter - Feature Phone{% endblock %}
+
+{% block content %}
+<h1>3GP Converter</h1>
+<p class="center"><strong>Video for Feature Phones</strong></p>
+
+<form method="POST" action="/convert">
+<input type="hidden" name="format" value="3gp">
+
+<p><strong>Paste YouTube URL:</strong></p>
+<input type="text" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
+
+<p><strong>3GP Video Quality:</strong></p>
+<select name="video_quality" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+<option value="auto">Auto (Recommended - Low Quality)</option>
+{% for key, preset in video_presets.items() %}
+<option value="{{ key }}">{{ preset.name }} - {{ preset.description }}</option>
+{% endfor %}
+</select>
+
+<p><strong>Subtitle Options (EXPERIMENTAL):</strong></p>
+<div style="margin-bottom: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+<label style="display: flex; align-items: center; cursor: pointer;">
+<input type="checkbox" name="burn_subtitles" value="on" style="margin-right: 8px;">
+<span>Burn English subtitles into video (YouTube style)</span>
+</label>
+<p style="font-size: 11px; color: #856404; margin: 5px 0 0 0;"><strong>⚠️ Note:</strong> Requires ImageMagick on server. May not work on all deployments.<br>• Only for videos under 45 minutes and 500MB<br>• Uses auto-generated or manual English subtitles<br>• Processing may take longer<br>• Feature will fail gracefully if dependencies missing</p>
+</div>
+
+<button type="submit">Start Conversion</button>
+</form>
+
+<hr>
+
+<div class="info">
+<p class="center"><strong>Quick Actions:</strong></p>
+<p class="center">
+<a href="/mp3" class="button" style="margin: 5px;">MP3 Converter</a>
+<a href="/search" class="button" style="margin: 5px;">Search Videos</a>
+</p>
+</div>
+
+<hr>
+
+<div class="info">
+<h2>How it works:</h2>
+<ul>
+<li>Paste any YouTube URL</li>
+<li>Choose 3GP video quality</li>
+<li>Download works on 2G networks</li>
+<li>Perfect for Nokia phones</li>
+</ul>
+</div>
+
+<div class="info">
+<h2>3GP Quality Options:</h2>
+<ul>
+<li>Ultra Low: ~2.3 MB per 5 min (10fps, 150k video)</li>
+<li>Low: ~3.2 MB per 5 min (12fps, 200k video)</li>
+<li>Medium: ~4.6 MB per 5 min (15fps, 300k video)</li>
+<li>High: ~6 MB per 5 min (18fps, 400k video)</li>
+</ul>
+<p style="font-size: 12px; color: #666;">All 3GP: 24kbps AAC audio, 16kHz, mono</p>
+<p><strong>Details:</strong></p>
+<ul>
+<li>Resolution: 176x144</li>
+<li>Max length: {{ max_hours|int }} hours</li>
+<li>Files auto-delete after 6 hours</li>
+</ul>
+</div>
+
+<div class="info">
+<p class="center"><strong>100% Free - No Ads</strong></p>
+<p class="center">Works on Opera Mini 4.4</p>
+</div>
+
+{% if not has_cookies %}
+<div class="info">
+<p class="center" style="font-size: 12px; color: #666;">Server uses 7 download methods to work without cookies. If downloads fail repeatedly, <a href="/cookies" style="color: #4a904a; text-decoration: underline;">cookies can help</a>.</p>
+</div>
+{% else %}
+<div class="success">
+<p class="center">[OK] Cookies configured - enhanced reliability</p>
+</div>
+{% endif %}
+{% endblock %}

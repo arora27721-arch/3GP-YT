@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Subtitle Burner - History{% endblock %}
+
+{% block extra_style %}
+<style>
+    .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    .history-item {
+        background: rgba(0,0,0,0.2);
+        border-radius: 10px;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    .history-info {
+        flex: 1;
+        min-width: 200px;
+    }
+    .history-title {
+        font-weight: 600;
+        color: #e8e8e8;
+        margin-bottom: 5px;
+    }
+    .history-meta {
+        font-size: 0.9rem;
+        color: #888;
+    }
+    .history-status {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .status-completed {
+        background: rgba(40,167,69,0.2);
+        color: #28a745;
+    }
+    .status-processing {
+        background: rgba(255,193,7,0.2);
+        color: #ffc107;
+    }
+    .status-failed {
+        background: rgba(220,53,69,0.2);
+        color: #dc3545;
+    }
+    .history-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .btn-small {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #888;
+    }
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 25px; color: #00d2ff;">Processing History</h2>
+    
+    {% if jobs %}
+        <div class="history-list">
+            {% for job in jobs %}
+            <div class="history-item">
+                <div class="history-info">
+                    <div class="history-title">{{ job.video_filename or 'Unknown Video' }}</div>
+                    <div class="history-meta">
+                        {{ job.output_format | upper if job.output_format else 'MP4' }} | 
+                        {{ job.quality | capitalize if job.quality else 'Medium' }} |
+                        {{ job.created_at[:16] if job.created_at else 'Unknown date' }}
+                    </div>
+                </div>
+                
+                <span class="history-status 
+                    {% if job.status == 'completed' %}status-completed
+                    {% elif job.status == 'failed' %}status-failed
+                    {% else %}status-processing{% endif %}">
+                    {{ job.status | capitalize }}
+                </span>
+                
+                <div class="history-actions">
+                    <a href="{{ url_for('status', job_id=job.job_id) }}" class="btn btn-secondary btn-small">View</a>
+                    {% if job.status == 'completed' %}
+                        <a href="{{ url_for('download', job_id=job.job_id) }}" class="btn btn-small">Download</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">&#128193;</div>
+            <p>No processing history yet</p>
+            <p><a href="{{ url_for('index') }}" style="color: #00d2ff;">Upload your first video</a></p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

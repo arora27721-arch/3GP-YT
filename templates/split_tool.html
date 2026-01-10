@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Split Tool - Split Downloaded Files{% endblock %}
+
+{% block content %}
+<h1>Split Downloaded Files</h1>
+
+<div class="info" style="background: #fff9e6; border-color: #d4a017;">
+<p class="center"><strong>[*] SPLIT YOUR DOWNLOADED FILES</strong></p>
+<p class="center" style="font-size: 14px;">Split large files into smaller parts for easier download on 2G/3G networks</p>
+</div>
+
+{% if files and files|length > 0 %}
+<div class="info">
+<p class="center"><strong>Available Files to Split:</strong></p>
+<p style="font-size: 12px; color: #666; margin-bottom: 15px;">Select a file below to split it into smaller parts</p>
+
+{% for file in files %}
+<div style="background: #f9f9f9; border: 2px solid #4a90a4; padding: 15px; margin-bottom: 15px; border-radius: 5px;">
+<p style="font-size: 16px; font-weight: bold; margin: 0 0 10px 0;">{{ file.filename }}</p>
+<p style="font-size: 13px; color: #666; margin: 5px 0;">
+<strong>Size:</strong> {{ file.size_human }} | 
+<strong>Format:</strong> {{ file.format }} | 
+<strong>Duration:</strong> {{ file.duration_human }}
+</p>
+
+<form method="POST" action="/split_tool" style="margin-top: 15px;">
+<input type="hidden" name="file_id" value="{{ file.file_id }}">
+
+<fieldset style="border: 2px solid #d4a017; padding: 10px; margin-bottom: 10px;">
+<legend style="font-weight: bold; padding: 0 5px;">Split Settings:</legend>
+
+<div style="margin: 10px 0;">
+<label style="font-size: 14px; display: block; margin-bottom: 10px;">
+<strong>Number of parts (2-50):</strong>
+<input type="number" name="num_parts" value="5" min="2" max="50" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
+</label>
+<p style="font-size: 12px; color: #666;">
+Split {{ file.size_human }} file ({{ file.duration_human }}) into equal parts
+</p>
+</div>
+
+<div style="background: #fffacd; padding: 10px; margin-top: 10px; border: 1px solid #d4a017; border-radius: 3px;">
+<p style="font-size: 13px; font-weight: bold; margin: 0 0 5px 0; color: #8b6914;">⏱ IMPORTANT:</p>
+<p style="font-size: 12px; margin: 0; line-height: 1.4; color: #333;">
+Each part is properly re-encoded for feature phone compatibility. This takes time (a few minutes) but ensures every part plays correctly on your phone.
+</p>
+</div>
+</fieldset>
+
+<button type="submit" class="button" style="background: #d4a017; font-size: 16px; padding: 12px; width: 100%;">
+[*] SPLIT THIS FILE
+</button>
+</form>
+</div>
+{% endfor %}
+</div>
+
+<div class="info">
+<p class="center"><strong>Why Split Files?</strong></p>
+<ul>
+<li>Easier to download on slow 2G/3G networks</li>
+<li>Can resume individual parts if download interrupted</li>
+<li>Each part properly encoded for feature phones</li>
+<li>Guaranteed to work on old phones</li>
+</ul>
+</div>
+
+{% else %}
+<div class="info">
+<p class="center"><strong>No files available for splitting</strong></p>
+<p class="center">Convert some videos first, then come back here to split them!</p>
+</div>
+
+<a href="/" class="button" style="background: #4a904a;">Convert a Video</a>
+{% endif %}
+
+<hr>
+<a href="/" class="button">← Back to Home</a>
+<a href="/history" class="button" style="background: #4a90a4;">View History</a>
+
+{% endblock %}

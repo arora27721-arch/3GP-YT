@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Split File Downloads{% endblock %}
+
+{% block content %}
+<h1>Download Split Parts</h1>
+
+<div class="success">
+<p class="center"><strong>[OK] FILE SPLIT SUCCESSFULLY!</strong></p>
+<p class="center" style="font-size: 16px; font-weight: bold;">{{ parts|length }} parts ready to download</p>
+</div>
+
+<div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>SPLIT INFO</strong></p>
+<ul style="list-style: none; padding: 0;">
+<li><strong>Total Parts:</strong> {{ parts|length }}</li>
+<li><strong>Download each part separately</strong></li>
+<li><strong>Parts are numbered sequentially</strong></li>
+</ul>
+</div>
+
+<div class="info" style="background: #fff9e6; border-color: #d4a017;">
+<p class="center"><strong>HOW TO USE SPLIT FILES</strong></p>
+<ol style="font-size: 14px;">
+<li><strong>Download all parts</strong> - Save each part to the same folder</li>
+<li><strong>Keep the names</strong> - Don't rename the files</li>
+<li><strong>Join parts</strong> - Use a file joiner app or command:</li>
+</ol>
+
+{% if parts|length > 0 %}
+<div style="background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px;">
+<p style="font-size: 12px; font-weight: bold; margin: 5px 0;">Windows Command:</p>
+<code style="background: #fff; padding: 5px; display: block; font-size: 11px; overflow-x: auto; word-wrap: break-word;">copy /b {% for part in parts %}{{ part.filename }}{% if not loop.last %}+{% endif %}{% endfor %} output{{ parts[0].filename[parts[0].filename.rfind('.'):] }}</code>
+
+<p style="font-size: 12px; font-weight: bold; margin: 10px 0 5px 0;">Mac/Linux Command:</p>
+<code style="background: #fff; padding: 5px; display: block; font-size: 11px; overflow-x: auto; word-wrap: break-word;">cat {% for part in parts %}{{ part.filename }}{% if not loop.last %} {% endif %}{% endfor %} > output{{ parts[0].filename[parts[0].filename.rfind('.'):] }}</code>
+
+<p style="font-size: 11px; color: #666; margin-top: 10px;">
+<strong>Tip:</strong> Copy the command above after downloading all parts to your computer
+</p>
+</div>
+{% endif %}
+</div>
+
+<h2 style="margin-top: 20px; margin-bottom: 10px;">Download Parts:</h2>
+
+{% for part in parts %}
+<div style="background: white; border: 2px solid #4a90a4; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+<p style="font-size: 18px; font-weight: bold; margin: 0 0 10px 0;">
+Part {{ part.part_num }} of {{ parts|length }}
+</p>
+<p style="font-size: 14px; color: #666; margin: 5px 0;">
+<strong>File:</strong> {{ part.filename }}
+</p>
+<p style="font-size: 14px; color: #666; margin: 5px 0;">
+<strong>Size:</strong> {{ part.size_human }}
+</p>
+<a href="/download_part/{{ part.filename }}" class="button" style="background: #4a904a; font-size: 16px; padding: 12px; margin-top: 10px;">
+>> DOWNLOAD PART {{ part.part_num }}
+</a>
+</div>
+{% endfor %}
+
+<hr style="margin: 30px 0;">
+
+<div class="info">
+<p class="center"><strong>[!] IMPORTANT:</strong></p>
+<ul>
+<li>Download all parts in order</li>
+<li>Each part expires in 6 hours</li>
+<li>Save all parts to the same folder</li>
+<li>Use a file joiner to combine parts</li>
+</ul>
+<p class="center" style="margin-top: 10px;"><strong>Bookmark this page to access parts later</strong></p>
+</div>
+
+<a href="/status/{{ file_id }}" class="button" style="background: #4a90a4;"><< Back to Download Page</a>
+<a href="/" class="button">Convert Another Video</a>
+
+{% endblock %}

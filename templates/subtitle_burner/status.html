@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Subtitle Burner - Processing Status{% endblock %}
+
+{% block extra_style %}
+<style>
+    .status-card {
+        text-align: center;
+    }
+    .status-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+    }
+    .status-icon.processing {
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.1); }
+    }
+    .status-title {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        color: #00d2ff;
+    }
+    .status-message {
+        color: #aaa;
+        margin-bottom: 25px;
+        font-size: 1.1rem;
+    }
+    .progress-bar {
+        background: rgba(0,0,0,0.3);
+        border-radius: 10px;
+        height: 10px;
+        margin: 20px 0;
+        overflow: hidden;
+    }
+    .progress-bar-inner {
+        height: 100%;
+        background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+        animation: progress-animation 2s infinite;
+        width: 100%;
+    }
+    @keyframes progress-animation {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+    .file-info {
+        background: rgba(0,0,0,0.2);
+        border-radius: 8px;
+        padding: 15px;
+        margin: 20px 0;
+        text-align: left;
+    }
+    .file-info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .file-info-row:last-child {
+        border-bottom: none;
+    }
+    .file-info-label {
+        color: #888;
+    }
+    .file-info-value {
+        color: #e8e8e8;
+        font-weight: 500;
+    }
+    .download-section {
+        margin-top: 30px;
+    }
+    .download-btn {
+        font-size: 1.2rem;
+        padding: 15px 40px;
+        margin: 5px;
+    }
+    .completed { color: #28a745; }
+    .failed { color: #dc3545; }
+    .processing { color: #ffc107; }
+    
+    .parts-list {
+        margin-top: 25px;
+        text-align: left;
+    }
+    .parts-list h3 {
+        color: #00d2ff;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    .part-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(0,0,0,0.2);
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+    .part-info {
+        flex: 1;
+    }
+    .part-name {
+        font-weight: 600;
+        color: #e8e8e8;
+    }
+    .part-meta {
+        font-size: 0.85rem;
+        color: #888;
+        margin-top: 3px;
+    }
+    .part-download {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    .time-info {
+        background: rgba(40,167,69,0.15);
+        border: 1px solid rgba(40,167,69,0.3);
+        border-radius: 8px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+    .time-info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card status-card">
+    {% if status.status == 'completed' %}
+        <div class="status-icon">&#9989;</div>
+        <h2 class="status-title completed">3GP with Subtitles Ready!</h2>
+    {% elif status.status == 'failed' %}
+        <div class="status-icon">&#10060;</div>
+        <h2 class="status-title failed">Processing Failed</h2>
+    {% else %}
+        <div class="status-icon processing">&#9881;</div>
+        <h2 class="status-title processing">Processing...</h2>
+        <div class="progress-bar">
+            <div class="progress-bar-inner"></div>
+        </div>
+    {% endif %}
+
+    <p class="status-message">{{ status.progress }}</p>
+
+    <div class="file-info">
+        <div class="file-info-row">
+            <span class="file-info-label">Video:</span>
+            <span class="file-info-value">{{ status.video_filename or 'N/A' }}</span>
+        </div>
+        <div class="file-info-row">
+            <span class="file-info-label">Subtitle:</span>
+            <span class="file-info-value">{{ status.subtitle_filename or 'N/A' }}</span>
+        </div>
+        {% if status.video_duration %}
+        <div class="file-info-row">
+            <span class="file-info-label">Duration:</span>
+            <span class="file-info-value">{{ status.video_duration }}</span>
+        </div>
+        {% endif %}
+        {% if status.video_size %}
+        <div class="file-info-row">
+            <span class="file-info-label">Input Size:</span>
+            <span class="file-info-value">{{ status.video_size }}</span>
+        </div>
+        {% endif %}
+        <div class="file-info-row">
+            <span class="file-info-label">Output Format:</span>
+            <span class="file-info-value">3GP</span>
+        </div>
+        <div class="file-info-row">
+            <span class="file-info-label">Quality:</span>
+            <span class="file-info-value">{{ status.quality | capitalize if status.quality else 'Medium' }}</span>
+        </div>
+        {% if status.split_part_count and status.split_part_count > 0 %}
+        <div class="file-info-row">
+            <span class="file-info-label">Split Parts:</span>
+            <span class="file-info-value">{{ status.split_part_count }} parts</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if status.estimated_time or status.actual_time %}
+    <div class="time-info">
+        {% if status.estimated_time %}
+        <div class="time-info-row">
+            <span class="file-info-label">Estimated Time:</span>
+            <span class="file-info-value">{{ status.estimated_time }}</span>
+        </div>
+        {% endif %}
+        {% if status.actual_time %}
+        <div class="time-info-row">
+            <span class="file-info-label">Actual Time:</span>
+            <span class="file-info-value">{{ status.actual_time }}</span>
+        </div>
+        {% endif %}
+        {% if status.file_size %}
+        <div class="time-info-row">
+            <span class="file-info-label">Output Size:</span>
+            <span class="file-info-value">{{ status.file_size }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if status.status == 'completed' %}
+        {% if status.split_parts is defined and status.split_parts is iterable and status.split_parts|length > 0 %}
+            <div class="parts-list">
+                <h3>Download Split Parts</h3>
+                {% for part in status.split_parts %}
+                <div class="part-item">
+                    <div class="part-info">
+                        <div class="part-name">Part {{ part.part_num }}</div>
+                        <div class="part-meta">{{ part.size_human }} | Starts at {{ part.start_time }}</div>
+                    </div>
+                    <a href="{{ url_for('download_part', job_id=job_id, part_num=part.part_num) }}" class="btn part-download">Download</a>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="download-section" style="margin-top: 20px;">
+                <p style="color: #888; margin-bottom: 10px;">Or download the full file:</p>
+                <a href="{{ url_for('download', job_id=job_id) }}" class="btn btn-secondary download-btn">Download Full 3GP</a>
+            </div>
+        {% else %}
+            <div class="download-section">
+                <a href="{{ url_for('download', job_id=job_id) }}" class="btn download-btn">Download 3GP</a>
+            </div>
+        {% endif %}
+    {% elif status.status == 'failed' %}
+        <div class="download-section">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Try Again</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_script %}
+{% if status.status not in ['completed', 'failed'] %}
+<script>
+setTimeout(function() {
+    location.reload();
+}, 5000);
+</script>
+{% endif %}
+{% endblock %}

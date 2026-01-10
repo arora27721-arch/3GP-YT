@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Search YouTube - Feature Phone{% endblock %}
+
+{% block content %}
+<h1>Search YouTube</h1>
+
+<form method="POST" action="/search">
+<p><strong>Search for videos:</strong></p>
+<input type="text" name="query" placeholder="Enter search term..." value="{{ query }}" required>
+<button type="submit">Search</button>
+</form>
+
+<p class="center">
+<a href="/search/settings" style="font-size: 12px;">Filter Settings</a> | 
+<a href="/">Back to Converter</a>
+</p>
+
+{% if settings %}
+{% set has_filters = settings.duration != 'any' or settings.upload_date != 'any' or settings.sort_by != 'relevance' or settings.content_type != 'video' or settings.quality != 'any' or settings.subtitles or settings.creative_commons or settings.live or settings['3d'] or settings.vr180 or settings.results_count != 10 or settings.region != 'auto' or settings.min_views > 0 %}
+{% if has_filters %}
+<div class="info" style="font-size: 11px; padding: 5px;">
+<strong>Active Filters:</strong>
+{% if settings.duration != 'any' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.duration }}</span>{% endif %}
+{% if settings.upload_date != 'any' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.upload_date }}</span>{% endif %}
+{% if settings.sort_by != 'relevance' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.sort_by }}</span>{% endif %}
+{% if settings.content_type != 'video' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.content_type }}</span>{% endif %}
+{% if settings.quality != 'any' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.quality }}</span>{% endif %}
+{% if settings.subtitles %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">subtitles</span>{% endif %}
+{% if settings.creative_commons %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">CC</span>{% endif %}
+{% if settings.live %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">live</span>{% endif %}
+{% if settings['3d'] %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">3D</span>{% endif %}
+{% if settings.vr180 %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">VR</span>{% endif %}
+{% if settings.results_count != 10 %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.results_count }} results</span>{% endif %}
+{% if settings.region != 'auto' %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.region }}</span>{% endif %}
+{% if settings.min_views > 0 %}<span style="background:#444;padding:2px 4px;margin:2px;display:inline-block;">{{ settings.min_views }}+ views</span>{% endif %}
+<br><a href="/search/settings" style="font-size: 10px;">Edit Filters</a>
+</div>
+{% endif %}
+{% endif %}
+
+<hr>
+
+{% if results is not none %}
+  {% if results|length > 0 %}
+    <div class="info">
+    <h2>Results for "{{ query }}":</h2>
+    <p style="font-size: 11px;">Found {{ results|length }} result(s)</p>
+    <form method="GET" style="margin: 10px 0;">
+    <input type="hidden" name="query" value="{{ query }}">
+    {% if show_thumbnails %}
+    <input type="hidden" name="show_thumbnails" value="0">
+    <button type="submit" style="padding: 5px 10px; font-size: 12px;">Hide Thumbnails (Save Data)</button>
+    {% else %}
+    <input type="hidden" name="show_thumbnails" value="1">
+    <button type="submit" style="padding: 5px 10px; font-size: 12px;">Show Thumbnails</button>
+    {% endif %}
+    </form>
+    </div>
+    
+    {% for video in results %}
+    <div class="status">
+    {% if show_thumbnails %}
+    <p style="text-align: center; margin: 5px 0;">
+    <img src="{{ video.thumbnail }}" alt="Thumbnail" style="max-width: 120px; height: auto; border: 1px solid #666;">
+    </p>
+    {% endif %}
+    <p><strong>{{ loop.index }}. {{ video.title }}</strong></p>
+    <p style="font-size: 12px; color: #666;">
+    Channel: {{ video.channel }}<br>
+    Uploaded: {{ video.upload_date }} | {{ video.views }}<br>
+    Duration: {{ video.duration }}
+    </p>
+    
+    <form method="POST" action="/convert" style="margin: 5px 0;">
+    <input type="hidden" name="url" value="{{ video.url }}">
+    <p style="margin: 5px 0;">
+    <input type="radio" name="format" value="3gp" id="v{{ loop.index }}_3gp" checked>
+    <label for="v{{ loop.index }}_3gp">3GP</label>
+    <input type="radio" name="format" value="mp3" id="v{{ loop.index }}_mp3">
+    <label for="v{{ loop.index }}_mp3">MP3</label>
+    </p>
+    
+    <p style="font-size: 12px; margin: 5px 0;"><strong>3GP Quality:</strong></p>
+    <select name="video_quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
+    <option value="auto">Auto (Low)</option>
+    <option value="ultralow">Ultra Low (~2.3MB/5min)</option>
+    <option value="low">Low (~3.2MB/5min)</option>
+    <option value="medium">Medium (~4.6MB/5min)</option>
+    <option value="high">High (~6MB/5min)</option>
+    </select>
+    
+    <p style="font-size: 12px; margin: 5px 0;"><strong>MP3 Quality:</strong></p>
+    <select name="mp3_quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
+    <option value="auto">Auto (128kbps)</option>
+    <option value="medium">128kbps (~5MB/5min)</option>
+    <option value="high">192kbps (~7MB/5min)</option>
+    <option value="veryhigh">256kbps (~9MB/5min)</option>
+    <option value="extreme">320kbps (~12MB/5min)</option>
+    </select>
+    
+    <button type="submit">Convert This</button>
+    </form>
+    </div>
+    {% endfor %}
+    
+  {% else %}
+    <div class="error">
+    <p>No results found for "{{ query }}"</p>
+    <p>Try different search terms or <a href="/search/settings">adjust your filters</a></p>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="info">
+  <h2>How to search:</h2>
+  <ul>
+  <li>Enter song, artist, or video name</li>
+  <li>Shows title and duration</li>
+  <li>Choose format and convert</li>
+  <li>Works without YouTube API</li>
+  <li><a href="/search/settings">Use filters</a> to refine results</li>
+  </ul>
+  </div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: youtube-3gp-converter
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "bash build.sh"
+    startCommand: "gunicorn --bind=0.0.0.0:$PORT --workers=1 --threads=1 --timeout=600 --max-requests=50 --max-requests-jitter=10 --worker-class=sync --worker-tmp-dir=/dev/shm app:app"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: KEEP_ALIVE_ENABLED
+        value: "true"
+      - key: KEEP_ALIVE_INTERVAL
+        value: "300"
+      - key: FFMPEG_THREADS
+        value: "1"
+      - key: MAX_VIDEO_DURATION
+        value: "1800"
+      - key: MAX_FILESIZE
+        value: "500M"
+      - key: MAX_CONCURRENT_DOWNLOADS
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
