@@ -307,11 +307,14 @@ MP3_QUALITY_PRESETS = {
 VIDEO_QUALITY_PRESETS = {
     'ultralow': {
         'name': 'Ultra Low (2G Networks)',
-        'video_bitrate': '150k',
-        'audio_bitrate': '64k',
-        'audio_sample_rate': '44100',
-        'fps': '10',
-        'description': '~2 MB per 5 min'
+        'video_codec': 'h263',
+        'video_bitrate': '40k',
+        'video_filter': 'scale=176:144,fps=8',
+        'audio_codec': 'libopencore_amrnb',
+        'audio_bitrate': '8k',
+        'audio_sample_rate': '8000',
+        'gop': '90',
+        'description': 'Under 14MB for 30min'
     },
     'low': {
         'name': 'Low (Recommended for Feature Phones)',
@@ -1933,6 +1936,28 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                 '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
                 '-compression_level', '9',  # Maximum compression (smaller files, slightly slower)
                 '-joint_stereo', '1',  # Better stereo compression (5-10% smaller)
+                '-y',
+                output_path
+            ]
+        elif quality == 'ultralow':
+            update_status(file_id, {
+                'status': 'converting',
+                'progress': f'Converting to Ultra Low 3GP video... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Highly optimized for maximum compression.'
+            })
+
+            # ULTRA LOW optimized 3GP conversion
+            convert_cmd = [
+                '-threads', str(FFMPEG_THREADS),
+                '-i', temp_video,
+                '-vf', quality_preset.get('video_filter', 'scale=176:144,fps=8'),
+                '-c:v', 'h263',
+                '-b:v', quality_preset.get('video_bitrate', '40k'),
+                '-g', quality_preset.get('gop', '90'),
+                '-c:a', 'amr_nb',
+                '-b:a', quality_preset.get('audio_bitrate', '8k'),
+                '-ac', '1',
+                '-ar', quality_preset.get('audio_sample_rate', '8000'),
+                '-f', '3gp',
                 '-y',
                 output_path
             ]

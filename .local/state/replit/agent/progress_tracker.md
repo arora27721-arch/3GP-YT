@@ -8,5 +8,6 @@
 [x] 8. Add next/prev buttons at bottom of search results
 [x] 9. Add search bar on top of conversion/status page
 [x] 10. Ensure search query is in web address (GET instead of POST)
+[x] 11. Optimize 'Ultra Low' 3GP preset for maximum compression (30min < 14MB) using H.263 and AMR-NB
 [x] 7. Install Python 3.11 and required packages (Flask, yt-dlp, gunicorn, requests)
 [x] 8. Verify Flask application is running correctly on port 5000
