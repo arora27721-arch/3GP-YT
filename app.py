@@ -3092,18 +3092,22 @@ def search():
     settings = get_search_settings()
     
     show_thumbnails = request.args.get('show_thumbnails', '0') == '1'
+    page = int(request.args.get('page', 1))
+    results_per_page = 10
 
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
+        # Redirect to GET to put query in URL
+        return redirect(url_for('search', query=query, show_thumbnails=1 if show_thumbnails else 0))
     else:
         query = request.args.get('query', '').strip()
 
     if not query:
-        if request.method == 'POST':
-            flash('Please enter a search term')
-        return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails, settings=settings)
+        return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails, settings=settings, page=page)
 
     try:
+        # Adjust results_count based on page
+        effective_results_count = page * results_per_page
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
@@ -3122,7 +3126,10 @@ def search():
         results = []
         search_results = None
         
-        search_query, _ = build_yt_search_query(query, settings)
+        # Build search query with the updated results count
+        temp_settings = settings.copy()
+        temp_settings['results_count'] = effective_results_count
+        search_query, _ = build_yt_search_query(query, temp_settings)
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -3138,17 +3145,22 @@ def search():
                 flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
             else:
                 flash('YouTube search error. Please try again.')
-            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings)
+            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
         except Exception as e:
             logger.error(f"Search extraction error: {str(e)}")
             flash('Search failed. Please try again later.')
-            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings)
+            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
         if search_results and 'entries' in search_results:
             min_views = settings.get('min_views', 0)
             duration_filter = settings.get('duration', 'any')
             
-            for entry in search_results['entries']:
+            # Skip entries from previous pages
+            start_index = (page - 1) * results_per_page
+            entries = search_results['entries']
+            
+            for i in range(start_index, len(entries)):
+                entry = entries[i]
                 if entry and entry.get('id'):
                     duration = entry.get('duration', 0) or 0
                     view_count = entry.get('view_count', 0) or 0
@@ -3210,12 +3222,21 @@ def search():
                         'view_count': view_count,
                         'thumbnail': thumbnail_url,
                     })
+                    
+                    if len(results) >= results_per_page:
+                        break
 
         if not results:
-            flash('No results found. Try different search terms or adjust filters.')
-            return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails, settings=settings)
+            if page > 1:
+                flash('No more results found.')
+                return redirect(url_for('search', query=query, page=1, show_thumbnails=1 if show_thumbnails else 0))
+            return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
-        return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails, settings=settings)
+        return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
+    except Exception as e:
+        logger.error(f"General search error: {str(e)}")
+        flash(f"An unexpected error occurred: {str(e)}")
+        return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
     except Exception as e:
         logger.error(f"Unexpected search error: {str(e)}")
