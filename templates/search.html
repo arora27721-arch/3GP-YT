@@ -48,6 +48,7 @@
     <p style="font-size: 11px;">Found {{ results|length }} result(s)</p>
     <form method="GET" style="margin: 10px 0;">
     <input type="hidden" name="query" value="{{ query }}">
+    <input type="hidden" name="page" value="{{ page }}">
     {% if show_thumbnails %}
     <input type="hidden" name="show_thumbnails" value="0">
     <button type="submit" style="padding: 5px 10px; font-size: 12px;">Hide Thumbnails (Save Data)</button>
@@ -65,7 +66,7 @@
     <img src="{{ video.thumbnail }}" alt="Thumbnail" style="max-width: 120px; height: auto; border: 1px solid #666;">
     </p>
     {% endif %}
-    <p><strong>{{ loop.index }}. {{ video.title }}</strong></p>
+    <p><strong>{{ (page - 1) * 10 + loop.index }}. {{ video.title }}</strong></p>
     <p style="font-size: 12px; color: #666;">
     Channel: {{ video.channel }}<br>
     Uploaded: {{ video.upload_date }} | {{ video.views }}<br>
@@ -103,6 +104,13 @@
     </form>
     </div>
     {% endfor %}
+
+    <div style="margin-top: 20px; text-align: center;">
+    {% if page > 1 %}
+    <a href="{{ url_for('search', query=query, page=page-1, show_thumbnails=1 if show_thumbnails else 0) }}" class="button" style="display: inline-block; width: auto; margin: 5px;">Prev Page</a>
+    {% endif %}
+    <a href="{{ url_for('search', query=query, page=page+1, show_thumbnails=1 if show_thumbnails else 0) }}" class="button" style="display: inline-block; width: auto; margin: 5px;">Next Page</a>
+    </div>
     
   {% else %}
     <div class="error">

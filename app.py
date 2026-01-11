@@ -2545,16 +2545,23 @@ def download(file_id):
     file_status = status_data.get(file_id, {})
     video_title = file_status.get('video_title', 'video')
 
+    download_as_job_id = request.args.get('as_job_id') == '1'
+    
     if os.path.exists(file_path_mp4_subs):
-        return send_file(file_path_mp4_subs, as_attachment=True, download_name=f'{video_title}_with_subs.mp4')
+        dn = f'{file_id}.mp4' if download_as_job_id else f'{video_title}_with_subs.mp4'
+        return send_file(file_path_mp4_subs, as_attachment=True, download_name=dn)
     elif os.path.exists(file_path_mp4):
-        return send_file(file_path_mp4, as_attachment=True, download_name=f'{video_title}.mp4')
+        dn = f'{file_id}.mp4' if download_as_job_id else f'{video_title}.mp4'
+        return send_file(file_path_mp4, as_attachment=True, download_name=dn)
     elif os.path.exists(file_path_3gp_subs):
-        return send_file(file_path_3gp_subs, as_attachment=True, download_name=f'{video_title}_with_subs.3gp')
+        dn = f'{file_id}.3gp' if download_as_job_id else f'{video_title}_with_subs.3gp'
+        return send_file(file_path_3gp_subs, as_attachment=True, download_name=dn)
     elif os.path.exists(file_path_3gp):
-        return send_file(file_path_3gp, as_attachment=True, download_name=f'{video_title}.3gp')
+        dn = f'{file_id}.3gp' if download_as_job_id else f'{video_title}.3gp'
+        return send_file(file_path_3gp, as_attachment=True, download_name=dn)
     elif os.path.exists(file_path_mp3):
-        return send_file(file_path_mp3, as_attachment=True, download_name=f'{video_title}.mp3')
+        dn = f'{file_id}.mp3' if download_as_job_id else f'{video_title}.mp3'
+        return send_file(file_path_mp3, as_attachment=True, download_name=dn)
     else:
         flash('File not found or has been deleted')
         return redirect(url_for('index'))

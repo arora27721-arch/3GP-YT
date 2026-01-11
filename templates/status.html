@@ -11,6 +11,16 @@
 {% block content %}
 <h1>Conversion Status</h1>
 
+<div class="info" style="margin-bottom: 20px;">
+<form method="GET" action="/search">
+<p style="margin: 0 0 5px 0;"><strong>Quick Search:</strong></p>
+<div style="display: flex;">
+<input type="text" name="query" placeholder="Search YouTube..." style="flex: 1; margin-bottom: 0; padding: 5px;">
+<button type="submit" style="width: auto; margin-bottom: 0; margin-left: 5px; padding: 5px 10px;">Search</button>
+</div>
+</form>
+</div>
+
 {% if file_status.status == 'downloading' or file_status.status == 'converting' or file_status.status == 'burning_subtitles' %}
 <div class="status">
 <p class="center"><strong>[...] PROCESSING YOUR VIDEO...</strong></p>
@@ -57,6 +67,7 @@
 {% endif %}
 
 <a href="/download/{{ file_id }}" class="button" style="background: #4a904a; font-size: 18px; padding: 15px; margin-bottom: 10px;">>> DOWNLOAD FULL FILE</a>
+<a href="/download/{{ file_id }}?as_job_id=1" class="button" style="background: #2e7d32; font-size: 18px; padding: 15px; margin-bottom: 10px;">>> DOWNLOAD WITH JOB ID</a>
 
 <div class="info" style="background: #fff9e6; border-color: #d4a017;">
 <p class="center"><strong>[*] SPLIT FILE FOR EASIER DOWNLOAD</strong></p>
