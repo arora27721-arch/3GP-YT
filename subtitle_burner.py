@@ -38,7 +38,7 @@ ALLOWED_SUBTITLE_EXTENSIONS = {'srt', 'SRT', 'ass', 'ASS', 'vtt', 'VTT'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))
+FFMPEG_THREADS = 1  # Hardcoded to 1 thread for 0.1 CPU environment
 
 def get_ffmpeg_path():
     possible_paths = ['ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/tmp/bin/ffmpeg']

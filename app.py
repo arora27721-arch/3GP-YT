@@ -263,7 +263,7 @@ SUBTITLE_MAX_FILESIZE_MB = int(os.environ.get('SUBTITLE_MAX_FILESIZE_MB', 2000))
 ENABLE_SUBTITLE_BURNING = os.environ.get('ENABLE_SUBTITLE_BURNING', 'true').lower() == 'true'
 
 # FFmpeg performance settings - optimized for Render free tier (0.1 CPU)
-FFMPEG_THREADS = int(os.environ.get('FFMPEG_THREADS', 1))  # 1 thread for Render free tier (0.1 CPU)
+FFMPEG_THREADS = 1  # Hardcoded to 1 thread for 0.1 CPU environment
 
 # Playlist processing settings for Render free tier
 PLAYLIST_MAX_VIDEOS = int(os.environ.get('PLAYLIST_MAX_VIDEOS', 50))  # Max videos per playlist
@@ -1927,6 +1927,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             # MP3 conversion with quality preset and ENHANCED compression
             # All presets use stereo (2 channels) as described in the preset descriptions
             convert_cmd = [
+                '-threads', '1',  # Limit to 1 thread for 0.1 CPU
                 '-i', temp_video,
                 '-vn',  # No video
                 '-acodec', 'libmp3lame',
@@ -1947,7 +1948,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
 
             # ULTRA LOW optimized 3GP conversion
             convert_cmd = [
-                '-threads', str(FFMPEG_THREADS),
+                '-threads', '1',  # Strictly limit to 1 thread for 0.1 CPU
                 '-i', temp_video,
                 '-vf', quality_preset.get('video_filter', 'scale=176:144,fps=8'),
                 '-c:v', 'h263',
@@ -1975,7 +1976,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             gop_size = fps_num * 10  # GOP every 10 seconds for better compression
 
             convert_cmd = [
-                '-threads', str(FFMPEG_THREADS),
+                '-threads', '1',  # Strictly limit to 1 thread for 0.1 CPU
                 '-i', temp_video,
                 '-vf','scale=176:144:force_original_aspect_ratio=increase,setsar=1',
                 '-vcodec', 'mpeg4',
