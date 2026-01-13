@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Format Details - YouTube to 3GP{% endblock %}
+
+{% block content %}
+<h1>Format Details</h1>
+<div class="info">
+    <h2>3GP Video Quality Options:</h2>
+    <ul>
+        <li><strong>Ultra Low:</strong> ~2.3 MB per 5 min (10fps, 150k video)</li>
+        <li><strong>Low:</strong> ~3.2 MB per 5 min (12fps, 200k video)</li>
+        <li><strong>Medium:</strong> ~4.6 MB per 5 min (15fps, 300k video)</li>
+        <li><strong>High:</strong> ~6 MB per 5 min (18fps, 400k video)</li>
+    </ul>
+    <p style="font-size: 12px; color: #666;">All 3GP videos: 24kbps AAC audio, 176x144 resolution</p>
+    
+    <h2>MP3 Audio Quality Options:</h2>
+    <ul>
+        <li><strong>128 kbps:</strong> ~5 MB per 5 min (good)</li>
+        <li><strong>192 kbps:</strong> ~7 MB per 5 min (high)</li>
+        <li><strong>256 kbps:</strong> ~9 MB per 5 min (very high)</li>
+        <li><strong>320 kbps:</strong> ~12 MB per 5 min (maximum)</li>
+    </ul>
+    
+    <h2>All formats:</h2>
+    <ul>
+        <li><strong>Resolution:</strong> 176x144 (3GP only)</li>
+        <li><strong>Max length:</strong> 24 hours</li>
+        <li><strong>Files auto-delete:</strong> after 6 hours</li>
+    </ul>
+</div>
+
+<div class="status">
+    <p><strong>Subtitle Options - EXPERIMENTAL (3GP Video Only):</strong></p>
+    <p style="font-size: 11px; color: #856404;">
+        ⚠️ Note: Requires ImageMagick on server. May not work on all deployments.<br>
+        • Only for videos under 45 minutes and 500MB<br>
+        • Uses auto-generated or manual English subtitles<br>
+        • Processing may take longer<br>
+        • Only applies when 3GP Video is selected<br>
+        • Feature will fail gracefully if dependencies missing
+    </p>
+</div>
+
+<div class="center">
+    <a href="/" class="button">Back to Home</a>
+</div>
+{% endblock %}
