@@ -1950,14 +1950,14 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             convert_cmd = [
                 '-threads', '1',  # Strictly limit to 1 thread for 0.1 CPU
                 '-i', temp_video,
-                '-vf', quality_preset.get('video_filter', 'scale=176:144,fps=8'),
+                '-vf', 'scale=176:144,fps=8',
                 '-c:v', 'h263',
-                '-b:v', quality_preset.get('video_bitrate', '40k'),
-                '-g', quality_preset.get('gop', '90'),
+                '-b:v', '40k',
+                '-g', '90',
                 '-c:a', 'amr_nb',
-                '-b:a', quality_preset.get('audio_bitrate', '12.2k'),
+                '-b:a', '12.2k',
                 '-ac', '1',
-                '-ar', quality_preset.get('audio_sample_rate', '8000'),
+                '-ar', '8000',
                 '-f', '3gp',
                 '-y',
                 output_path
