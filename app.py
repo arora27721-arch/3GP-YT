@@ -3120,16 +3120,17 @@ def search():
     show_thumbnails = request.args.get('show_thumbnails', '0') == '1'
     page = int(request.args.get('page', 1))
     results_per_page = 10
+    force_format = request.args.get('force_format') or request.form.get('force_format')
 
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
         # Redirect to GET to put query in URL
-        return redirect(url_for('search', query=query, show_thumbnails=1 if show_thumbnails else 0))
+        return redirect(url_for('search', query=query, force_format=force_format, show_thumbnails=1 if show_thumbnails else 0))
     else:
         query = request.args.get('query', '').strip()
 
     if not query:
-        return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails, settings=settings, page=page)
+        return render_template('search.html', results=None, query='', force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
     try:
         # Adjust results_count based on page
@@ -3255,14 +3256,14 @@ def search():
         if not results:
             if page > 1:
                 flash('No more results found.')
-                return redirect(url_for('search', query=query, page=1, show_thumbnails=1 if show_thumbnails else 0))
-            return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
+                return redirect(url_for('search', query=query, force_format=force_format, page=1, show_thumbnails=1 if show_thumbnails else 0))
+            return render_template('search.html', results=[], query=query, force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
-        return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
+        return render_template('search.html', results=results, query=query, force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
     except Exception as e:
         logger.error(f"General search error: {str(e)}")
         flash(f"An unexpected error occurred: {str(e)}")
-        return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
+        return render_template('search.html', results=None, query=query, force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
     except Exception as e:
         logger.error(f"Unexpected search error: {str(e)}")

@@ -6,6 +6,15 @@
 <h1>3GP Converter</h1>
 <p class="center"><strong>Video for Feature Phones</strong></p>
 
+<div class="info">
+    <p class="center"><strong>Search for 3GP:</strong></p>
+    <form method="GET" action="/search">
+        <input type="text" name="query" placeholder="Search video name..." required>
+        <input type="hidden" name="force_format" value="3gp">
+        <button type="submit">Search 3GP</button>
+    </form>
+</div>
+
 <form method="POST" action="/convert">
 <input type="hidden" name="format" value="3gp">
 
@@ -38,7 +47,6 @@
 <p class="center"><strong>Quick Actions:</strong></p>
 <p class="center">
 <a href="/mp3" class="button" style="margin: 5px;">MP3 Converter</a>
-<a href="/search" class="button" style="margin: 5px;">Search Videos</a>
 </p>
 </div>
 

@@ -8,6 +8,9 @@
 <form method="POST" action="/search">
 <p><strong>Search for videos:</strong></p>
 <input type="text" name="query" placeholder="Enter search term..." value="{{ query }}" required>
+{% if force_format %}
+<input type="hidden" name="force_format" value="{{ force_format }}">
+{% endif %}
 <button type="submit">Search</button>
 </form>
 
@@ -49,6 +52,9 @@
     <form method="GET" style="margin: 10px 0;">
     <input type="hidden" name="query" value="{{ query }}">
     <input type="hidden" name="page" value="{{ page }}">
+    {% if force_format %}
+    <input type="hidden" name="force_format" value="{{ force_format }}">
+    {% endif %}
     {% if show_thumbnails %}
     <input type="hidden" name="show_thumbnails" value="0">
     <button type="submit" style="padding: 5px 10px; font-size: 12px;">Hide Thumbnails (Save Data)</button>
@@ -75,13 +81,19 @@
     
     <form method="POST" action="/convert" style="margin: 5px 0;">
     <input type="hidden" name="url" value="{{ video.url }}">
+    {% if force_format %}
+    <input type="hidden" name="format" value="{{ force_format }}">
+    <p style="margin: 5px 0;"><strong>Format: {{ force_format|upper }}</strong></p>
+    {% else %}
     <p style="margin: 5px 0;">
     <input type="radio" name="format" value="3gp" id="v{{ loop.index }}_3gp" checked>
     <label for="v{{ loop.index }}_3gp">3GP</label>
     <input type="radio" name="format" value="mp3" id="v{{ loop.index }}_mp3">
     <label for="v{{ loop.index }}_mp3">MP3</label>
     </p>
+    {% endif %}
     
+    {% if not force_format or force_format == '3gp' %}
     <p style="font-size: 12px; margin: 5px 0;"><strong>3GP Quality:</strong></p>
     <select name="video_quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
     <option value="auto">Auto (Low)</option>
@@ -90,7 +102,9 @@
     <option value="medium">Medium (~4.6MB/5min)</option>
     <option value="high">High (~6MB/5min)</option>
     </select>
+    {% endif %}
     
+    {% if not force_format or force_format == 'mp3' %}
     <p style="font-size: 12px; margin: 5px 0;"><strong>MP3 Quality:</strong></p>
     <select name="mp3_quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
     <option value="auto">Auto (128kbps)</option>
@@ -99,6 +113,7 @@
     <option value="veryhigh">256kbps (~9MB/5min)</option>
     <option value="extreme">320kbps (~12MB/5min)</option>
     </select>
+    {% endif %}
     
     <button type="submit">Convert This</button>
     </form>
@@ -107,9 +122,9 @@
 
     <div style="margin-top: 20px; text-align: center;">
     {% if page > 1 %}
-    <a href="{{ url_for('search', query=query, page=page-1, show_thumbnails=1 if show_thumbnails else 0) }}" class="button" style="display: inline-block; width: auto; margin: 5px;">Prev Page</a>
+    <a href="{{ url_for('search', query=query, force_format=force_format, page=page-1, show_thumbnails=1 if show_thumbnails else 0) }}" class="button" style="display: inline-block; width: auto; margin: 5px;">Prev Page</a>
     {% endif %}
-    <a href="{{ url_for('search', query=query, page=page+1, show_thumbnails=1 if show_thumbnails else 0) }}" class="button" style="display: inline-block; width: auto; margin: 5px;">Next Page</a>
+    <a href="{{ url_for('search', query=query, force_format=force_format, page=page+1, show_thumbnails=1 if show_thumbnails else 0) }}" class="button" style="display: inline-block; width: auto; margin: 5px;">Next Page</a>
     </div>
     
   {% else %}

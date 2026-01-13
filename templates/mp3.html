@@ -6,6 +6,15 @@
 <h1>MP3 Converter</h1>
 <p class="center"><strong>Audio Only</strong></p>
 
+<div class="info">
+    <p class="center"><strong>Search for MP3:</strong></p>
+    <form method="GET" action="/search">
+        <input type="text" name="query" placeholder="Search song name..." required>
+        <input type="hidden" name="force_format" value="mp3">
+        <button type="submit">Search MP3</button>
+    </form>
+</div>
+
 <form method="POST" action="/convert">
 <input type="hidden" name="format" value="mp3">
 
@@ -29,7 +38,6 @@
 <p class="center"><strong>Quick Actions:</strong></p>
 <p class="center">
 <a href="/3gp" class="button" style="margin: 5px;">3GP Converter</a>
-<a href="/search" class="button" style="margin: 5px;">Search Videos</a>
 </p>
 </div>
 
