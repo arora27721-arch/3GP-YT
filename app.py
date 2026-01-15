@@ -3278,8 +3278,60 @@ def cookies_page():
     MAX_COOKIE_FILE_SIZE = 2 * 1024 * 1024  # 2MB limit
     
     if request.method == 'POST':
-        # ... (rest of the post logic)
-        pass
+        # Handle cookie deletion
+        if request.form.get('delete_cookies') == '1':
+            if has_cookies():
+                try:
+                    os.remove(COOKIES_FILE)
+                    flash('Cookies deleted successfully')
+                except Exception as e:
+                    flash(f'Error deleting cookies: {str(e)}')
+            return redirect(url_for('cookies_page'))
+
+        # Handle file upload
+        if 'cookies_file' not in request.files:
+            flash('No file part')
+            return redirect(request.url)
+        
+        file = request.files['cookies_file']
+        if file.filename == '':
+            flash('No selected file')
+            return redirect(request.url)
+
+        if file:
+            try:
+                # Read file content to validate size and basic format
+                content = file.read(MAX_COOKIE_FILE_SIZE + 1)
+                if len(content) > MAX_COOKIE_FILE_SIZE:
+                    flash(f'File too large (max {MAX_COOKIE_FILE_SIZE // (1024*1024)}MB)')
+                    return redirect(request.url)
+                
+                # Basic validation
+                if not content or b'youtube.com' not in content.lower():
+                    flash('Invalid cookie file. Make sure it contains YouTube cookies in Netscape format.')
+                    return redirect(request.url)
+
+                # Ensure folder exists
+                os.makedirs(COOKIES_FOLDER, exist_ok=True)
+
+                # Save file atomically
+                temp_path = COOKIES_FILE + '.tmp'
+                with open(temp_path, 'wb') as f:
+                    f.write(content)
+                os.replace(temp_path, COOKIES_FILE)
+                
+                # Full validation
+                is_valid, message, health = validate_cookies()
+                if is_valid:
+                    flash(f'Cookies uploaded successfully! {message}')
+                else:
+                    flash(f'Cookies uploaded but validation failed: {message}')
+                    
+                return redirect(url_for('cookies_page'))
+            except Exception as e:
+                logger.error(f"Error uploading cookies: {e}")
+                flash(f'Error uploading cookies: {str(e)}')
+                return redirect(request.url)
 
     # GET request - show cookie status
     cookies_exist = has_cookies()
