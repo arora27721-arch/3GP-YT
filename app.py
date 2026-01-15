@@ -2705,7 +2705,14 @@ def split_media_file_background(file_path, num_parts, file_id, split_id, quality
             quality_preset = None
             logger.warning(f"[SPLIT {split_id}] Unknown file extension: {ext}")
         
-        quality_name = quality_preset['name'] if quality_preset else 'Unknown'
+        if not quality_preset:
+            update_split_status(split_id, {
+                'status': 'error',
+                'error': f'Quality settings not found for: {ext}'
+            })
+            return
+
+        quality_name = quality_preset['name']
 
         update_split_status(split_id, {
             'status': 'processing',
@@ -3264,11 +3271,6 @@ def search():
         logger.error(f"General search error: {str(e)}")
         flash(f"An unexpected error occurred: {str(e)}")
         return render_template('search.html', results=None, query=query, force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
-
-    except Exception as e:
-        logger.error(f"Unexpected search error: {str(e)}")
-        flash('An unexpected error occurred. Please try again.')
-        return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings)
 
 @app.route('/cookies', methods=['GET', 'POST'])
 def cookies_page():
