@@ -16,3 +16,7 @@ flask
 gunicorn
 requests
 yt-dlp
+flask
+gunicorn
+requests
+yt-dlp
