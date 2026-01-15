@@ -185,8 +185,11 @@ def build_yt_search_query(query, settings):
         filters.append("purchased=true")
     
     if filters:
-        filter_str = ",".join(filters)
-        search_query = f"{search_prefix}{query}"
+        # For YouTube search, we can append filters as keywords
+        # Note: yt-dlp doesn't support direct filter strings in ytsearch, 
+        # so we add them as search terms which YouTube's engine understands
+        filter_query = " ".join(filters)
+        search_query = f"{search_prefix}{query} {filter_query}"
     else:
         search_query = f"{search_prefix}{query}"
     
