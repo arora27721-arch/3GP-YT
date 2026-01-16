@@ -1709,18 +1709,14 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
         # Add cookies if available (with health validation)
         cookiefile = get_valid_cookiefile()
         if cookiefile:
-            base_opts['cookiefile'] = cookiefile
-            # If we have cookies, we can also try the 'web' client which is often more reliable with cookies
-            # but we keep the mobile strategies as they are generally more robust on cloud IPs
-            logger.info(f"Using validated cookies for download: {file_id}")
-        else:
-            # Fallback: check if the file exists even if validation failed slightly
-            # Some cookie files might be slightly malformed but still usable by yt-dlp
-            if has_cookies():
-                base_opts['cookiefile'] = COOKIES_FILE
-                logger.info(f"Using cookies (validation was not perfect but file exists): {file_id}")
+            # Check if cookiefile actually exists and is not empty
+            if os.path.exists(cookiefile) and os.path.getsize(cookiefile) > 0:
+                base_opts['cookiefile'] = cookiefile
+                logger.info(f"Using validated cookies for download: {file_id}")
             else:
-                logger.info(f"No cookies available - proceeding without cookies: {file_id}")
+                logger.warning(f"Cookie validation returned non-existent or empty file: {cookiefile}")
+        else:
+            logger.info(f"No valid cookies available - proceeding with multi-strategy download: {file_id}")
 
         last_error = None
         download_success = False
