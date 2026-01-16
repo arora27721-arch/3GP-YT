@@ -35,4 +35,19 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "vm"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=1", "--threads=4", "--timeout=120", "app:app"]
+
+[userenv]
+
+[userenv.shared]
+USE_IPV6 = "true"
+PLAYLIST_MAX_VIDEOS = "20"
+MAX_CONCURRENT_DOWNLOADS = "1"
+KEEP_ALIVE_ENABLED = "true"
+MAX_VIDEO_DURATION = "7200"
+DISK_SPACE_THRESHOLD_MB = "100"
+ENABLE_DISK_SPACE_MONITORING = "true"
+MAX_FILESIZE = "1G"
+FFMPEG_DEFAULT_TIMEOUT = "0"
+DOWNLOAD_TIMEOUT = "3600"
