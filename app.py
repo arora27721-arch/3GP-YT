@@ -764,8 +764,16 @@ def get_valid_cookiefile():
         return None
     
     try:
+        # Check if cookie file exists
+        if not os.path.exists(COOKIES_FILE):
+            return None
+            
+        # Basic size check
+        if os.path.getsize(COOKIES_FILE) < 10:
+            logger.warning("Cookie file is suspiciously small")
+            return None
+
         is_valid, message, health = validate_cookies()
-        
         if not is_valid:
             logger.warning(f"Cookie validation failed: {message}")
             return None
