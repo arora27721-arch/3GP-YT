@@ -10,6 +10,8 @@ echo "Installing system dependencies..."
 apt-get update
 apt-get install -y --no-install-recommends \
     ffmpeg \
+    imagemagick \
+    fonts-dejavu-core \
     curl
 
 # Clean up to reduce image size

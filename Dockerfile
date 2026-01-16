@@ -28,7 +28,6 @@ ENV PYTHONUNBUFFERED=1 \
 # Install runtime dependencies INCLUDING ImageMagick for subtitle burning
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    yt-dlp \
     imagemagick \
     fonts-dejavu-core \
     curl \
