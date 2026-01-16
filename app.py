@@ -3255,8 +3255,14 @@ def cookies_page():
                     return redirect(request.url)
                 
                 # Basic validation
-                if not content or b'youtube.com' not in content.lower():
-                    flash('Invalid cookie file. Make sure it contains YouTube cookies in Netscape format.')
+                if not content:
+                    flash('The uploaded file is empty.')
+                    return redirect(request.url)
+                
+                # We'll be more lenient here and let validate_cookies handle the format check
+                # but we'll check if it looks like a cookies file (at least some tabs or specific structure)
+                if b'\t' not in content and b'youtube.com' not in content.lower():
+                    flash('Invalid cookie file format. Please upload a standard Netscape cookies.txt file.')
                     return redirect(request.url)
 
                 # Ensure folder exists
@@ -3273,7 +3279,12 @@ def cookies_page():
                 if is_valid:
                     flash(f'Cookies uploaded successfully! {message}')
                 else:
-                    flash(f'Cookies uploaded but validation failed: {message}')
+                    # Check if it's a Netscape format at least, even if it doesn't have youtube.com
+                    # (user might be uploading a global cookie file or from a different domain)
+                    if health.get('cookie_count', 0) > 0:
+                        flash(f'Cookies uploaded. {message}')
+                    else:
+                        flash(f'Cookies uploaded but validation failed: {message}')
                     
                 return redirect(url_for('cookies_page'))
             except Exception as e:
