@@ -1545,19 +1545,20 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             'outtmpl': temp_video,
             'max_filesize': MAX_FILESIZE,
             'nocheckcertificate': True,
-            'retries': 10,  # Reduced since we try 7 different strategies
+            'retries': 10,
             'fragment_retries': 10,
-            'sleep_requests': 2,  # Longer delay between requests to avoid bot detection
-            'sleep_interval': 3,  # Additional sleep interval
-            'max_sleep_interval': 10,  # Max random sleep to appear more human
-            'concurrent_fragment_downloads': 10,  # Sequential to avoid rate limits
+            'sleep_requests': 2,
+            'sleep_interval': 3,
+            'max_sleep_interval': 10,
+            'concurrent_fragment_downloads': 10,
             'ignoreerrors': False,
             'extractor_retries': 8,
-            'socket_timeout': 60,  # 0 = no timeout (infinite)
-            'http_chunk_size': 10485760,  # 10MB
+            'socket_timeout': 60,
             'quiet': False,
             'no_warnings': False,
             'logger': logger,
+            'allow_unplayable_formats': True,
+            'dynamic_mpd': True,
         }
 
         # YouTube IP block bypass: Use IPv6 if enabled (less blocked by YouTube)
@@ -1567,22 +1568,39 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
         else:
             base_opts['force_ipv4'] = True
 
-        # Add proxy if configured (bypass cloud IP blocks)
-        if PROXY_URL:
-            base_opts['proxy'] = PROXY_URL
-            logger.info(f"Using proxy for download (IP block bypass)")
-
-        # Add rate limiting if configured (avoid 429 errors)
-        if RATE_LIMIT_BYTES > 0:
-            base_opts['ratelimit'] = RATE_LIMIT_BYTES
-            logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
+        # Add cookies if available (with health validation)
+        cookiefile = get_valid_cookiefile()
 
         # Download strategies - OPTIMIZED FOR COOKIE-LESS CLOUD HOSTING (Nov 2025)
         # Multiple strategies to bypass YouTube's bot detection without requiring cookies
-        # Order: Mobile clients (least blocked) -> TV clients -> Web clients (fallback)
-        strategies = [
+        # Order: Web clients (best for cookies) -> Mobile clients -> TV clients
+        strategies = []
+        
+        # If cookies are present, prioritize Web/MWeb as they work best with auth
+        if cookiefile:
+            strategies.extend([
+                {
+                    'name': 'Web (Cookie-Optimized)',
+                    'opts': {
+                        'extractor_args': {'youtube': {
+                            'player_client': ['web'],
+                        }}
+                    }
+                },
+                {
+                    'name': 'MWeb (Cookie-Optimized)',
+                    'opts': {
+                        'extractor_args': {'youtube': {
+                            'player_client': ['mweb'],
+                        }}
+                    }
+                }
+            ])
+
+        # Always include mobile and TV fallbacks
+        strategies.extend([
             {
-                'name': 'Android (Primary)',
+                'name': 'Android (No-Cookie Fallback)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android'],
@@ -1597,7 +1615,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                 }
             },
             {
-                'name': 'iOS Client (Robust)',
+                'name': 'iOS (No-Cookie Fallback)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['ios'],
@@ -1618,28 +1636,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                         'player_skip': ['configs', 'webpage']
                     }}
                 }
-            },
-            {
-                'name': 'MWeb (Mobile Web)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['mweb'],
-                    }}
-                }
-            },
-            {
-                'name': 'Web Embedded (Fallback)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['web_embedded'],
-                        'player_skip': ['configs']
-                    }}
-                }
             }
-        ]
+        ])
 
-        # Add cookies if available (with health validation)
-        cookiefile = get_valid_cookiefile()
         if cookiefile:
             # Check if cookiefile actually exists and is not empty
             if os.path.exists(cookiefile) and os.path.getsize(cookiefile) > 0:
