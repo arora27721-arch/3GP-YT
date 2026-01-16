@@ -816,10 +816,9 @@ def validate_cookies():
                 content = f.read()
 
         if 'youtube.com' not in content.lower():
-            return False, "Cookie file does not contain YouTube cookies", health
-
-        if len(content.strip()) < 50:
-            return False, "Cookie file appears to be empty or invalid", health
+            # If no youtube.com found, it might still be valid if it's a generic cookies file
+            # or uses .google.com. We'll be more lenient but warn.
+            logger.warning("Cookie file does not explicitly mention youtube.com - proceeding anyway")
 
         lines = content.strip().split('\n')
         has_youtube_cookies = False
@@ -831,10 +830,13 @@ def validate_cookies():
                 continue
 
             # Parse Netscape cookie format: domain, flag, path, secure, expiration, name, value
+            # Support both tab and space delimiters (some exporters use spaces)
             parts = line.split('\t')
             if len(parts) < 7:
+                parts = re.split(r'\s+', line.strip())
+            
+            if len(parts) < 7:
                 health['malformed_lines'] += 1
-                logger.debug(f"Malformed cookie line {line_num}: expected 7 fields, got {len(parts)}")
                 continue
 
             try:
@@ -842,10 +844,10 @@ def validate_cookies():
                 cookie_name = parts[5].strip()
                 expiry_str = parts[4].strip()
 
-                if 'youtube.com' not in domain.lower():
-                    continue
-
-                has_youtube_cookies = True
+                # Be more lenient with domain check
+                if 'youtube.com' in domain.lower() or 'google.com' in domain.lower():
+                    has_youtube_cookies = True
+                
                 health['cookie_count'] += 1
 
                 # Check for session/auth cookies
@@ -882,11 +884,17 @@ def validate_cookies():
                 continue
 
         # Build detailed validation message
-        if not has_youtube_cookies:
-            return False, "No YouTube cookies detected in file. Make sure to export from youtube.com", health
+        if not has_youtube_cookies and health['cookie_count'] > 0:
+            # If we found cookies but none matched youtube.com explicitly, 
+            # we'll allow it but flag it
+            has_youtube_cookies = True
+            logger.info("Found cookies but none explicitly for youtube.com - allowing anyway")
 
-        if health['cookie_count'] < 3:
-            return False, f"Only {health['cookie_count']} YouTube cookie(s) found. Export cookies from youtube.com while logged in (need at least 3).", health
+        if not has_youtube_cookies:
+            return False, "No usable cookies detected in file.", health
+
+        if health['cookie_count'] < 1:
+            return False, "No cookies found in file.", health
 
         # Build success message with warnings
         messages = [f"✓ {health['cookie_count']} YouTube cookies found"]
@@ -1702,9 +1710,17 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
         cookiefile = get_valid_cookiefile()
         if cookiefile:
             base_opts['cookiefile'] = cookiefile
+            # If we have cookies, we can also try the 'web' client which is often more reliable with cookies
+            # but we keep the mobile strategies as they are generally more robust on cloud IPs
             logger.info(f"Using validated cookies for download: {file_id}")
         else:
-            logger.info(f"No valid cookies available - proceeding without cookies: {file_id}")
+            # Fallback: check if the file exists even if validation failed slightly
+            # Some cookie files might be slightly malformed but still usable by yt-dlp
+            if has_cookies():
+                base_opts['cookiefile'] = COOKIES_FILE
+                logger.info(f"Using cookies (validation was not perfect but file exists): {file_id}")
+            else:
+                logger.info(f"No cookies available - proceeding without cookies: {file_id}")
 
         last_error = None
         download_success = False
