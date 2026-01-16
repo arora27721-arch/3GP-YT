@@ -1582,20 +1582,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
         # Order: Mobile clients (least blocked) -> TV clients -> Web clients (fallback)
         strategies = [
             {
-                'name': 'Android Test Suite (Nov 2024 - Most Reliable)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['android_testsuite'],
-                        'player_skip': ['configs', 'webpage', 'js']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.45.38 (Linux; U; Android 14; en_US)',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                    }
-                }
-            },
-            {
-                'name': 'Android Client (Primary)',
+                'name': 'Android (Primary)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android'],
@@ -1606,46 +1593,11 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                         'X-YouTube-Client-Name': '3',
                         'X-YouTube-Client-Version': '19.45.38',
                         'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept': '*/*'
                     }
                 }
             },
             {
-                'name': 'Android Embedded (Cloud-Optimized)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['android_embedded'],
-                        'player_skip': ['configs', 'webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.45.38 (Linux; U; Android 14; en_US)',
-                        'X-YouTube-Client-Name': '55',
-                        'X-YouTube-Client-Version': '19.45.38',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept': '*/*',
-                        'Origin': 'https://www.youtube.com',
-                        'Referer': 'https://www.youtube.com/'
-                    }
-                }
-            },
-            {
-                'name': 'Android Music (Audio Optimized)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['android_music'],
-                        'player_skip': ['configs']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.android.apps.youtube.music/7.31.51 (Linux; U; Android 14) gzip',
-                        'X-YouTube-Client-Name': '21',
-                        'X-YouTube-Client-Version': '7.31.51',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept': '*/*'
-                    }
-                }
-            },
-            {
-                'name': 'iOS Client (Alternative)',
+                'name': 'iOS Client (Robust)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['ios'],
@@ -1655,27 +1607,24 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                         'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_1 like Mac OS X;)',
                         'X-YouTube-Client-Name': '5',
                         'X-YouTube-Client-Version': '19.45.4',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept-Encoding': 'gzip, deflate, br',
-                        'Referer': 'https://www.youtube.com/'
                     }
                 }
             },
             {
-                'name': 'TV Embedded (Less Restricted)',
+                'name': 'TV Client (Unrestricted)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['tv_embedded'],
+                        'player_client': ['tv'],
                         'player_skip': ['configs', 'webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.31 TV Safari/537.36',
-                        'Accept': '*/*',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Origin': 'https://www.youtube.com',
-                        'Referer': 'https://www.youtube.com/'
-                    }
+                    }}
+                }
+            },
+            {
+                'name': 'MWeb (Mobile Web)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['mweb'],
+                    }}
                 }
             },
             {
@@ -1684,32 +1633,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                     'extractor_args': {'youtube': {
                         'player_client': ['web_embedded'],
                         'player_skip': ['configs']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept-Encoding': 'gzip, deflate, br',
-                        'Origin': 'https://www.youtube.com',
-                        'Referer': 'https://www.youtube.com/',
-                        'Sec-Fetch-Dest': 'iframe',
-                        'Sec-Fetch-Mode': 'navigate',
-                        'Sec-Fetch-Site': 'cross-site'
-                    }
-                }
-            },
-            {
-                'name': 'Media Connect (Alternative)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['mediaconnect'],
-                        'player_skip': ['webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.android.apps.youtube.music/7.31.51 (Linux; U; Android 14)',
-                        'Accept': '*/*',
-                        'Accept-Language': 'en-US,en;q=0.9'
-                    }
+                    }}
                 }
             }
         ]

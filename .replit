@@ -1,4 +1,4 @@
-modules = ["web", "bash", "python-3.11"]
+modules = ["web", "bash", "python-3.11", "deno-2"]
 [agent]
 expertMode = true
 
