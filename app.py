@@ -806,6 +806,72 @@ def validate_cookies():
 
     health = {
         'cookie_count': 0,
+        'youtube_cookies': 0,
+        'expired_count': 0,
+        'earliest_expiry': None,
+        'expiring_soon': False,
+        'malformed_lines': 0,
+        'session_cookies': []
+    }
+    
+    current_time = int(time.time())
+    has_youtube_cookies = False
+
+    try:
+        with open(COOKIES_FILE, 'r') as f:
+            lines = f.readlines()
+
+        for line_num, line in enumerate(lines, 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            
+            parts = line.split('\t')
+            if len(parts) < 7:
+                health['malformed_lines'] += 1
+                continue
+                
+            health['cookie_count'] += 1
+            domain = parts[0].lower()
+            name = parts[5]
+            expiry = parts[4]
+
+            if 'youtube.com' in domain or 'google.com' in domain:
+                has_youtube_cookies = True
+                health['youtube_cookies'] += 1
+            
+            # Auth cookie check
+            if any(key in name for key in ['PSID', 'LOGIN', 'SAPISID', 'SSID', 'HSID', 'SID', 'APISID']):
+                health['session_cookies'].append(name)
+
+            try:
+                exp_time = int(expiry)
+                if exp_time > 0:
+                    if exp_time < current_time:
+                        health['expired_count'] += 1
+                    else:
+                        if health['earliest_expiry'] is None or exp_time < health['earliest_expiry']:
+                            health['earliest_expiry'] = exp_time
+                        if (exp_time - current_time) < (7 * 86400):
+                            health['expiring_soon'] = True
+            except:
+                pass
+
+        if health['cookie_count'] == 0:
+            return False, "No valid cookie lines found", health
+
+        if not has_youtube_cookies:
+            return True, f"Found {health['cookie_count']} cookies, but none for YouTube. Downloads might still fail.", health
+
+        if health['expired_count'] > 0:
+            return True, f"Detected {health['youtube_cookies']} YouTube cookies ({health['expired_count']} expired).", health
+
+        return True, f"Successfully validated {health['youtube_cookies']} YouTube cookies.", health
+
+    except Exception as e:
+        return False, f"Error validating cookies: {str(e)}", health
+
+        'cookie_count': 0,
         'session_cookies': [],
         'expired_count': 0,
         'expiring_soon': False,
