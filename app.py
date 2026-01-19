@@ -3024,50 +3024,49 @@ def search():
         return render_template('search.html', results=None, query='', force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
     try:
-        # Adjust results_count based on page
-        effective_results_count = page * results_per_page
+        search_query, settings = build_yt_search_query(query, settings)
+        
+        # Enhanced yt-dlp options for better search reliability in 2025/2026
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
             'force_generic_extractor': False,
-            'socket_timeout': 60,
+            'socket_timeout': 30,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'http_headers': {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Sec-Fetch-Mode': 'navigate',
+            },
+            # Use specific clients to bypass bot detection
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web', 'mweb', 'ios'],
+                    'player_skip': ['webpage', 'configs'],
+                }
+            }
         }
-
-        if settings.get('region') and settings['region'] != 'auto':
-            ydl_opts['geo_bypass_country'] = settings['region']
-
+        
         cookiefile = get_valid_cookiefile()
         if cookiefile:
             ydl_opts['cookiefile'] = cookiefile
+            logger.info("Using cookiefile for search")
 
         results = []
-        search_results = None
-        
-        # Build search query with the updated results count
-        temp_settings = settings.copy()
-        temp_settings['results_count'] = effective_results_count
-        search_query, _ = build_yt_search_query(query, temp_settings)
-
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            try:
                 search_results = ydl.extract_info(search_query, download=False)
-        except yt_dlp.utils.DownloadError as e:
-            error_msg = str(e)
-            logger.error(f"Search DownloadError: {error_msg}")
-            if 'timeout' in error_msg.lower():
-                flash('Search timed out. Please check your connection and try again.')
-            elif '429' in error_msg or 'too many requests' in error_msg.lower():
-                flash('Too many search requests. Please wait a few minutes and try again.')
-            elif '403' in error_msg or 'forbidden' in error_msg.lower():
-                flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
-            else:
-                flash('YouTube search error. Please try again.')
-            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
-        except Exception as e:
-            logger.error(f"Search extraction error: {str(e)}")
-            flash('Search failed. Please try again later.')
-            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails, settings=settings, page=page)
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"Search extraction error: {error_msg}")
+                if '429' in error_msg or 'too many requests' in error_msg.lower():
+                    flash('YouTube search is temporarily limited. Try again in a few minutes.')
+                elif '403' in error_msg or 'forbidden' in error_msg.lower():
+                    flash('Search blocked by YouTube. Please refresh your cookies.')
+                else:
+                    flash(f'Search error: {error_msg[:100]}')
+                return render_template('search.html', results=None, query=query, force_format=force_format, show_thumbnails=show_thumbnails, settings=settings, page=page)
 
         if search_results and 'entries' in search_results:
             min_views = settings.get('min_views', 0)
