@@ -1,0 +1,215 @@
+Got it.
+Below is a **NO-CHAT, PURE CHECKLIST + COMMANDS** you can give **directly to Replit Agent**.
+Purpose: **verify every suspected core problem step-by-step** in the real environment.
+
+---
+
+# ✅ YT-DLP + FFMPEG CORE CHECK SCRIPT (FOR REPLIT AGENT)
+
+## 0️⃣ Show versions (confirm update regression)
+
+```bash
+yt-dlp --version
+ffmpeg -version
+python --version
+```
+
+---
+
+## 1️⃣ Verify yt-dlp can list PLAYABLE formats (NO cookies)
+
+```bash
+yt-dlp -F \
+--extractor-args "youtube:player_client=android" \
+https://www.youtube.com/watch?v=7DNz25c6BRg
+```
+
+### EXPECTED (PASS)
+
+* Formats like: `mp4`, `webm`, `video+audio`
+* NOT only images
+
+### FAIL MEANS
+
+* Android client broken
+* yt-dlp update regression
+
+---
+
+## 2️⃣ Verify cookies are NOT breaking android
+
+```bash
+yt-dlp -F \
+--cookies cookies.txt \
+--extractor-args "youtube:player_client=android" \
+https://www.youtube.com/watch?v=7DNz25c6BRg
+```
+
+### EXPECTED
+
+```
+Skipping client "android" since it does not support cookies
+```
+
+### CONFIRMS
+
+* Cookies must NEVER be passed to android/ios
+
+---
+
+## 3️⃣ Verify WEB client is now SABR-blocked
+
+```bash
+yt-dlp -F \
+--cookies cookies.txt \
+--extractor-args "youtube:player_client=web" \
+https://www.youtube.com/watch?v=7DNz25c6BRg
+```
+
+### EXPECTED (FAIL)
+
+* Missing URLs
+* Images only
+* SABR warning
+
+### CONFIRMS
+
+* Web client unusable without PO token
+
+---
+
+## 4️⃣ Verify MP4 download WITHOUT FFmpeg conversion
+
+```bash
+yt-dlp \
+-f "bv*+ba/best" \
+--merge-output-format mp4 \
+--extractor-args "youtube:player_client=android" \
+-o test.mp4 \
+https://www.youtube.com/watch?v=7DNz25c6BRg
+```
+
+### EXPECTED (PASS)
+
+* `test.mp4` created
+* File size > 0
+
+---
+
+## 5️⃣ Verify FFmpeg 3GP conversion ALONE
+
+```bash
+ffmpeg -y -i test.mp4 \
+-vcodec h263 -acodec amr_nb \
+-vf "scale=176:144,fps=15" \
+-b:v 128k -b:a 12.2k \
+test.3gp
+```
+
+### EXPECTED (PASS)
+
+* `test.3gp` playable
+* Size small
+
+---
+
+## 6️⃣ Verify yt-dlp is NOT forcing 3GP
+
+```bash
+yt-dlp \
+-F \
+--extractor-args "youtube:player_client=android" \
+https://www.youtube.com/watch?v=7DNz25c6BRg | grep -i 3gp
+```
+
+### EXPECTED
+
+```
+(no output)
+```
+
+### CONFIRMS
+
+* YouTube provides NO 3GP anymore
+
+---
+
+## 7️⃣ Verify UNPLAYABLE flag presence (BUG CHECK)
+
+```bash
+grep -R "allow_unplayable_formats" .
+grep -R "3gp" .
+grep -R "itag" .
+```
+
+### EXPECTED
+
+* No `allow_unplayable_formats`
+* No hardcoded itags (17, 36)
+
+---
+
+## 8️⃣ Verify cookies are client-scoped in app
+
+```bash
+grep -R "cookiefile" app.py
+```
+
+### EXPECTED
+
+* Cookies ONLY in WEB strategy
+* NOT in base opts
+
+---
+
+## 9️⃣ Final sanity test (full pipeline)
+
+```bash
+yt-dlp \
+-f "bv*+ba/best" \
+--merge-output-format mp4 \
+--extractor-args "youtube:player_client=android" \
+-o final.mp4 \
+https://www.youtube.com/watch?v=7DNz25c6BRg \
+&& ffmpeg -i final.mp4 -f null -
+```
+
+### EXPECTED
+
+* Download succeeds
+* FFmpeg reads video/audio
+
+---
+
+# ✅ FINAL CONCLUSION MATRIX (AGENT SHOULD REPORT)
+
+| Check                     | Result      |
+| ------------------------- | ----------- |
+| Android formats available | PASS / FAIL |
+| Web client SABR blocked   | PASS / FAIL |
+| Cookies break android     | PASS / FAIL |
+| MP4 downloads             | PASS / FAIL |
+| FFmpeg converts           | PASS / FAIL |
+| 3GP forced by code        | YES / NO    |
+
+---
+
+This checklist **isolates 100% of the failure causes** you identified:
+
+* yt-dlp update regression
+* client mixing
+* cookie misuse
+* format selection collapse
+* FFmpeg never reached
+
+No theory.
+No assumptions.
+Only verifiable facts.
+
+If you want, next I can:
+
+* Turn this into an **automated bash diagnostic**
+* Or a **Replit Agent instruction prompt**
+* Or rewrite `app.py` based only on passed checks
+
+Say the word.

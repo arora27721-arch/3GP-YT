@@ -4,3 +4,7 @@ gunicorn==21.2.0
 requests==2.32.5
 requests==2.32.5
 yt-dlp>=2025.12.08
+flask
+gunicorn
+requests
+yt-dlp
