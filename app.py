@@ -1496,6 +1496,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             'no_warnings': False,
             'logger': logger,
             'dynamic_mpd': True,
+            'allow_unplayable_formats': True,
         }
 
         # YouTube IP block bypass: Use IPv6 if enabled (less blocked by YouTube)
@@ -1524,7 +1525,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                         'X-YouTube-Client-Name': '3',
                         'X-YouTube-Client-Version': '19.45.38',
                         'Accept-Language': 'en-US,en;q=0.9',
-                    }
+                    },
+                    'cookiefile': None, # Android doesn't support cookies
                 }
             },
             {
@@ -1538,7 +1540,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                         'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_1 like Mac OS X;)',
                         'X-YouTube-Client-Name': '5',
                         'X-YouTube-Client-Version': '19.45.4',
-                    }
+                    },
+                    'cookiefile': None, # iOS doesn't support cookies
                 }
             },
             {
@@ -1610,7 +1613,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                     time.sleep(delay)
 
                 # Merge strategy options with base options
-                ydl_opts = {**base_opts, **strategy['opts']}
+                # Ensure strategy-specific cookiefile overrides base_opts
+                ydl_opts = base_opts.copy()
+                ydl_opts.update(strategy['opts'])
 
                 # Override user agent if custom one is provided
                 if custom_ua:
