@@ -1495,7 +1495,6 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
             'quiet': False,
             'no_warnings': False,
             'logger': logger,
-            'allow_unplayable_formats': True,
             'dynamic_mpd': True,
         }
 
@@ -1510,35 +1509,11 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
         cookiefile = get_valid_cookiefile()
 
         # Download strategies - OPTIMIZED FOR COOKIE-LESS CLOUD HOSTING (Nov 2025)
-        # Multiple strategies to bypass YouTube's bot detection without requiring cookies
-        # Order: Web clients (best for cookies) -> Mobile clients -> TV clients
-        strategies = []
-        
-        # If cookies are present, prioritize Web/MWeb as they work best with auth
-        if cookiefile:
-            strategies.extend([
-                {
-                    'name': 'Web (Cookie-Optimized)',
-                    'opts': {
-                        'extractor_args': {'youtube': {
-                            'player_client': ['web'],
-                        }}
-                    }
-                },
-                {
-                    'name': 'MWeb (Cookie-Optimized)',
-                    'opts': {
-                        'extractor_args': {'youtube': {
-                            'player_client': ['mweb'],
-                        }}
-                    }
-                }
-            ])
-
-        # Always include mobile and TV fallbacks
-        strategies.extend([
+        # Always use mobile and TV clients to avoid SABR/PO token blocks
+        # Web clients are deprioritized as they often fail without PO tokens
+        strategies = [
             {
-                'name': 'Android (No-Cookie Fallback)',
+                'name': 'Android (Primary)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android'],
@@ -1553,7 +1528,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                 }
             },
             {
-                'name': 'iOS (No-Cookie Fallback)',
+                'name': 'iOS (Fallback)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['ios'],
@@ -1575,7 +1550,20 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                     }}
                 }
             }
-        ])
+        ]
+
+        # Add Web strategies as last resort if cookies are present
+        if cookiefile:
+            strategies.extend([
+                {
+                    'name': 'Web (Cookie-Fallback)',
+                    'opts': {
+                        'extractor_args': {'youtube': {
+                            'player_client': ['web'],
+                        }}
+                    }
+                }
+            ])
 
         if cookiefile:
             # Check if cookiefile actually exists and is not empty
