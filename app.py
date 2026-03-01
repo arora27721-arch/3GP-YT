@@ -1509,28 +1509,30 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
         # Add cookies if available (with health validation)
         cookiefile = get_valid_cookiefile()
 
-        # Download strategies - OPTIMIZED FOR COOKIE-LESS CLOUD HOSTING (Nov 2025)
-        # Always use mobile and TV clients to avoid SABR/PO token blocks
-        # Web clients are deprioritized as they often fail without PO tokens
+        # YouTube Client Strategy with GVS Token Support (Required for Render/Cloud)
+        # Optimized for Jan 2025 YouTube changes
         strategies = [
             {
-                'name': 'Android (Primary)',
+                'name': 'Android GVS (Stable)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android'],
-                        'player_skip': ['configs', 'webpage']
+                        'player_skip': ['configs', 'webpage'],
+                        'include_live_dash': False
                     }},
                     'http_headers': {
                         'User-Agent': 'com.google.android.youtube/19.45.38 (Linux; U; Android 14; en_US)',
                         'X-YouTube-Client-Name': '3',
                         'X-YouTube-Client-Version': '19.45.38',
-                        'Accept-Language': 'en-US,en;q=0.9',
                     },
-                    'cookiefile': None, # Android doesn't support cookies
+                    'params': {
+                        'client_strategy': 'gvs', # Use GVS token strategy for better cloud compatibility
+                    },
+                    'cookiefile': cookiefile if cookiefile else None, # Force cookies if available
                 }
             },
             {
-                'name': 'iOS (Fallback)',
+                'name': 'iOS (Secondary)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['ios'],
@@ -1541,7 +1543,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                         'X-YouTube-Client-Name': '5',
                         'X-YouTube-Client-Version': '19.45.4',
                     },
-                    'cookiefile': None, # iOS doesn't support cookies
+                    'cookiefile': cookiefile if cookiefile else None,
                 }
             },
             {
@@ -1550,7 +1552,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto', burn
                     'extractor_args': {'youtube': {
                         'player_client': ['tv'],
                         'player_skip': ['configs', 'webpage']
-                    }}
+                    }},
+                    'cookiefile': cookiefile if cookiefile else None,
                 }
             }
         ]
